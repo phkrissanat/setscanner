@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#2563eb">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="SET scanner">
+<title>SET scanner</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--tx:#1b2430;--mut:#566170;--bd:#c9d1da;--up:#087a43;--dn:#c42b2b;--ac:#1d4ed8;--warn:#8a5a00;--xd:#8a5200;--xdbg:rgba(180,100,0,.14);--pri:#fff;--upbg:#e3f6ec;--dnbg:#fde8e8;--wbg:#fff3d6;--nbg:#eef1f4}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0f141b;--card:#18202a;--tx:#e6ebf1;--mut:#9aa6b5;--bd:#2f3b49;--up:#2fd17f;--dn:#ff7b7b;--ac:#6ba3ff;--warn:#ffb020;--xd:#fbbf24;--xdbg:rgba(245,158,11,.18);--pri:#0b1220;--upbg:#12352a;--dnbg:#3b1d1f;--wbg:#3a2e10;--nbg:#222c38}}
+:root[data-theme=dark]{--bg:#0f141b;--card:#18202a;--tx:#e6ebf1;--mut:#9aa6b5;--bd:#2f3b49;--up:#2fd17f;--dn:#ff7b7b;--ac:#6ba3ff;--warn:#ffb020;--xd:#fbbf24;--xdbg:rgba(245,158,11,.18);--pri:#0b1220;--upbg:#12352a;--dnbg:#3b1d1f;--wbg:#3a2e10;--nbg:#222c38}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Noto Sans Thai","Sarabun",sans-serif;font-size:15px;line-height:1.45}
+.wrap{max-width:1536px;margin:0 auto;padding:12px;padding-bottom:40px}
+h1{font-size:20px;margin:6px 0 2px}
+#login:not([hidden]){min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding-bottom:12px}
+#login .panel{width:100%;max-width:340px;margin-bottom:0}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:14px}
+#theme{min-height:40px;min-width:44px;padding:0 10px;font-size:20px;line-height:1}
+.sub{color:var(--mut);font-size:13px;margin-bottom:12px}
+.panel{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin-bottom:12px}
+button{font:inherit;min-height:46px;padding:0 18px;border-radius:10px;border:1px solid var(--bd);background:var(--card);color:var(--tx);cursor:pointer}
+button.pri{background:var(--ac);border-color:var(--ac);color:var(--pri);font-weight:600}
+button:disabled{opacity:.55;cursor:default}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.prog{height:6px;background:var(--nbg);border-radius:4px;overflow:hidden;margin-top:10px;display:none}
+.prog i{display:block;height:100%;width:0;background:var(--ac);transition:width .2s}
+.msg{margin-top:8px;font-size:13px;color:var(--mut)}
+.msg.err{color:var(--dn)}
+.msg:empty{display:none}
+details summary{cursor:pointer;min-height:44px;display:flex;align-items:center;color:var(--ac)}
+textarea,input[type=text]{width:100%;font:inherit;padding:10px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--tx)}
+textarea{min-height:90px;resize:vertical}
+label{display:block;font-size:13px;color:var(--mut);margin:8px 0 4px}
+[hidden]{display:none!important}
+.sec{font-size:16px;font-weight:600;margin:18px 0 8px}
+.sec span{color:var(--mut);font-weight:400}
+.sec.pf{display:flex;align-items:baseline;white-space:nowrap}
+.pfs{white-space:nowrap;overflow:hidden;min-width:0;font-size:12px;margin:0 0 0 8px;color:var(--mut);line-height:1.6}.pfs b{color:var(--tx)}.pfs b.up{color:var(--up)}.pfs b.dn{color:var(--dn)}
+.sy{display:flex;align-items:center;flex-wrap:wrap}
+.lots{grid-column:1/-1;border-top:1px dashed var(--bd);padding-top:10px;display:none;flex-wrap:wrap;gap:8px;align-items:center;cursor:default}
+.lot{display:flex;align-items:center;gap:6px;border:1px solid var(--bd);border-radius:8px;padding:2px 4px 2px 10px;font-size:13px}
+.lot input{width:92px;min-height:40px;padding:0 8px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font:inherit}
+.lot input[data-f=q]{width:76px}
+.lot button,.lots>button{min-height:44px;min-width:44px;padding:0 12px}
+
+.ck{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;margin:-10px 0 -10px -12px;cursor:pointer}
+.ck input{width:22px;height:22px;cursor:pointer}
+.hd{display:none}
+.r{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;display:grid;grid-template-columns:repeat(2,1fr);gap:8px 12px;margin-bottom:10px;cursor:pointer}
+.c::before{content:attr(data-l);display:block;font-size:11px;color:var(--mut)}
+.sym,.det{grid-column:1/-1}
+.sym b{font-size:17px}
+.up{color:var(--up)}.dn{color:var(--dn)}
+small{font-size:12px}
+.chip{display:inline-block;font-size:12px;padding:2px 8px;border-radius:99px;margin:0 4px 4px 0;background:var(--nbg)}
+.chip.b{background:var(--upbg);color:var(--up)}.chip.s{background:var(--dnbg);color:var(--dn)}
+.st{display:inline-block;font-weight:600;padding:3px 10px;border-radius:8px;background:var(--nbg)}
+.st.buy{background:var(--upbg);color:var(--up)}.st.watch{background:var(--wbg);color:var(--warn)}.st.sell{background:var(--dnbg);color:var(--dn)}
+.det{display:none;border-top:1px dashed var(--bd);padding-top:8px;font-size:13px;color:var(--mut)}
+.r.open .det{display:block}
+.r.open .lots{display:flex}
+.sh{display:none}
+.det p{margin:4px 0}
+.xdb{display:inline-block;font-size:10px;line-height:1.4;font-weight:600;color:var(--xd);background:var(--xdbg);border-radius:4px;padding:0 5px;margin-top:2px;white-space:nowrap}
+.na{color:var(--mut)}
+.foot{color:var(--mut);font-size:12px;margin-top:16px}
+@media(max-width:767px){
+ .hd.g4,.r.g4{grid-template-columns:104px repeat(3,minmax(0,1fr))}
+ .wrap{padding:12px 10px}
+ .hd,.r{display:grid;grid-template-columns:104px repeat(4,minmax(0,1fr));gap:4px 5px;align-items:center}
+ .hd{padding:2px 10px;font-size:10px;color:var(--mut);align-items:end;line-height:1.25}
+ .hd>div{white-space:normal;overflow:hidden}
+ .r{padding:6px 10px;margin-bottom:6px;font-size:12px;border-radius:10px}
+ .c::before{display:none}
+ .c{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .sym,.det,.lots{grid-column:auto}
+ .det,.lots{grid-column:1/-1;white-space:normal}
+ .sym b{font-size:13px}
+ .sy{flex-wrap:nowrap;gap:3px}
+ .ck{width:26px;margin:-10px 0 -10px -6px}
+ .c:not(.sym){font-size:11.5px}
+ .ck input{width:18px;height:18px}
+ .st{font-size:11px;padding:1px 6px;border-radius:6px}
+ .c .x{display:none}
+ .sec{margin:14px 0 6px}
+ .lots,.det{min-width:0}
+ .lot{width:100%;box-sizing:border-box;flex-wrap:wrap}
+ .lot input{width:78px}
+ .lot input[data-f=q]{width:66px}
+}
+@media(min-width:768px){
+ .hd.g4,.r.g4{grid-template-columns:minmax(0,1.3fr) minmax(0,1.5fr) minmax(0,1fr) minmax(0,1.2fr)}
+ .wrap{max-width:960px;padding:20px}
+ .hd,.r{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1.5fr) minmax(0,1fr) minmax(0,1.2fr) minmax(0,1fr);gap:10px;align-items:center}
+ .hd{padding:6px 14px;font-size:12px;color:var(--mut)}
+ .r{padding:10px 14px;margin-bottom:8px}
+ .c::before{display:none}
+ .sym,.det,.lots{grid-column:auto}
+ .det,.lots{grid-column:1/-1}
+ .sy{flex-wrap:nowrap}
+}
+</style>
+<script>try{var t=localStorage.getItem('set_theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+</head>
+<body>
+<div class="wrap" id="login">
+ <h1>SET scanner</h1>
+ <div class="panel">
+  <button class="pri" id="signin" disabled>เข้าสู่ระบบด้วย Google</button>
+  <div class="msg" id="lmsg">กำลังตรวจสอบการเข้าสู่ระบบ…</div>
+ </div>
+</div>
+<div class="wrap" id="app" hidden>
+ <div class="top"><h1>SET scanner</h1><button id="theme" aria-label="สลับโหมดสว่าง/มืด" title="สลับโหมดสว่าง/มืด">🌙</button></div>
+
+ <div class="panel">
+  <div class="bar">
+   <span id="asof" class="msg" style="margin:0"></span>
+  </div>
+  <div class="prog" id="prog"><i></i></div>
+  <div class="msg" id="msg"></div>
+  <textarea id="list" hidden></textarea>
+ </div>
+
+ <div class="sec">watch list <span id="ne"></span></div>
+ <div class="hd g4">
+  <div>ชื่อหุ้น</div><div>ราคา</div><div>แนะนำ</div><div>ตัดขาดทุน</div>
+ </div>
+ <div class="list" id="out3"></div>
+
+ <div class="sec">available <span id="nb"></span></div>
+ <div class="hd g4">
+  <div>ชื่อหุ้น</div><div>ราคา</div><div>แนะนำ</div><div>ตัดขาดทุน</div>
+ </div>
+ <div class="list" id="out"></div>
+
+ <div class="sec pf">portfolio&nbsp;<span id="nh"></span><span class="pfs" id="pfs"></span></div>
+ <div class="hd">
+  <div>ชื่อหุ้น</div><div>ราคาเฉลี่ย</div><div>PnL</div><div>ตัดขาดทุน</div><div>ขาย</div>
+ </div>
+ <div class="list" id="out2"></div>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+//#pure-start
+function ema(a,n){const o=Array(a.length).fill(null),k=2/(n+1);let p=0,s=0;for(let i=0;i<a.length;i++){if(i<n-1){s+=a[i];continue}if(i===n-1){s+=a[i];p=s/n;o[i]=p;continue}p=a[i]*k+p*(1-k);o[i]=p}return o}
+function macd(c){const a=ema(c,12),b=ema(c,26),line=c.map((_,i)=>b[i]==null?null:a[i]-b[i]);const f=line.findIndex(v=>v!=null),sig=Array(c.length).fill(null);if(f>=0)ema(line.slice(f),9).forEach((v,j)=>sig[f+j]=v);return{line,sig}}
+// swing low ล่าสุดที่ยืนยันแล้ว (ต่ำกว่าแท่งข้างเคียง k แท่งทั้งสองฝั่ง) และต่ำกว่าราคา price
+function swingLow(l,price,i,k){for(let j=i-k;j>=k;j--){let ok=l[j]<price;for(let m=1;m<=k&&ok;m++){if(!(l[j]<l[j-m])||!(l[j]<=l[j+m]))ok=false}if(ok)return j}return -1}
+// ตัดแท่งของวันนี้ทิ้งถ้ายังไม่ปิดตลาด (ก่อน 17:00 เวลาไทย)
+function dropOpenBar(d,nowMs){
+ const n=d.t.length;if(!n)return d;
+ const o=new Date(nowMs+7*3600*1000),day=o.toISOString().slice(0,10),mins=o.getUTCHours()*60+o.getUTCMinutes();
+ const bd=new Date((d.t[n-1]+7*3600)*1000).toISOString().slice(0,10);
+ if(bd===day&&mins<17*60){for(const k of['t','c','h','l','v'])d[k].pop()}
+ return d}
+function analyze(sym,d){
+ const c=d.c,l=d.l,n=c.length,i=n-1,K=3;
+ if(n<60)return{sym,err:'ข้อมูลไม่พอ'};
+ const e12=ema(c,12),e26=ema(c,26),m=macd(c);
+ const ok=(...x)=>x.every(q=>q!=null&&!isNaN(q));
+ if(!ok(e12[i],e26[i]))return{sym,err:'ข้อมูลไม่พอ'};
+ const up=(x,y,j)=>ok(x[j],y[j],x[j-1],y[j-1])&&x[j]>y[j]&&x[j-1]<=y[j-1];
+ const dn=(x,y,j)=>ok(x[j],y[j],x[j-1],y[j-1])&&x[j]<y[j]&&x[j-1]>=y[j-1];
+ const cdcUp=up(e12,e26,i),cdcDn=dn(e12,e26,i);
+ const macdAbove=ok(m.line[i],m.sig[i])&&m.line[i]>m.sig[i];
+ const entry=cdcUp&&macdAbove;
+ const zone=e12[i]>e26[i]?'up':'dn';
+ let since=null;for(let j=i;j>0;j--){if(dn(e12,e26,j)){since=i-j;break}}
+ const price=c[i];
+ const sellPx=(zone==='dn'&&since!=null)?c[i-since]:null;
+ let plan=null,noSwing=false;
+ if(entry){const j=swingLow(l,price,i,K);if(j<0)noSwing=true;else plan={entry:price,sl:l[j],riskPct:(price-l[j])/price*100,swingAgo:i-j}}
+ let trail=null;{const j=swingLow(l,price,i,K);if(j>=0)trail={sl:l[j],riskPct:(price-l[j])/price*100,ago:i-j}}
+ return{trail,sym,price,chg:price-c[i-1],chgPct:(price/c[i-1]-1)*100,e12:e12[i],e26:e26[i],mh:ok(m.line[i],m.sig[i])?m.line[i]-m.sig[i]:null,cdcUp,cdcDn,macdAbove,entry,zone,since,sellPx,plan,noSwing,t:d.t[i]};
+}
+//#pure-end
+
+const DEF="ADVANC,AOT,AWC,BANPU,BBL,BDMS,BEM,BGRIM,BH,BTS,CBG,CENTEL,COM7,CPALL,CPF,CPN,CRC,DELTA,EGCO,GLOBAL,GPSC,GULF,HMPRO,IVL,KBANK,KCE,KTB,KTC,LH,MINT,MTC,OR,OSP,PTT,PTTEP,PTTGC,RATCH,SCB,SCC,SCGP,TIDLOR,TOP,TRUE,TTB,TU,WHA";
+const $=s=>document.querySelector(s);
+const S={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+let results=S.get('set_results3',[]),good=0,scanning=false;
+$('#list').value=S.get('set_list',DEF.replace(/,/g,', '));
+const parse=s=>[...new Set(String(s).toUpperCase().split(/[\s,;]+/).map(x=>x.replace(/\.BK$/,'').replace(/[^A-Z0-9&-]/g,'')).filter(Boolean))];
+const normLots=o=>{const r={};Object.keys(o||{}).forEach(k=>{r[k]=(o[k]||[]).map(v=>typeof v==='object'&&v?{p:+v.p||0,q:+v.q||0,t:+v.t||0}:{p:+v||0,q:100,t:0})});return r};
+let lots=normLots(S.get('set_lots',{}));
+let closed=[];
+let held=S.get('set_held2',null);if(!Array.isArray(held))held=parse(S.get('set_held',''));
+const PX='https://set-proxy.phkrissanath.workers.dev/?url={url}';
+const syms=()=>[...new Set([...parse($('#list').value),...held])];
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+async function getJson(url){
+ const px=PX;
+ const t=[];
+ if(px)t.push(u=>px.replace('{url}',encodeURIComponent(u)));
+ t.push(u=>u,u=>'https://corsproxy.io/?'+encodeURIComponent(u),u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u));
+ let last;
+ for(let k=0;k<t.length;k++){
+  const idx=(good+k)%t.length,ac=new AbortController(),to=setTimeout(()=>ac.abort(),15000);
+  try{const res=await fetch(t[idx](url),{signal:ac.signal});clearTimeout(to);if(!res.ok)throw new Error('HTTP '+res.status);const j=await res.json();good=idx;return j}
+  catch(e){clearTimeout(to);last=e}
+ }
+ throw last||new Error('fetch failed');
+}
+async function load(sym){
+ let err;
+ for(let a=0;a<3;a++){
+  try{
+   const j=await getJson(`https://${a%2?'query2':'query1'}.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}.BK?range=1y&interval=1d`);
+   const r=j&&j.chart&&j.chart.result&&j.chart.result[0];
+   if(!r||!r.timestamp)throw new Error('ไม่พบข้อมูล');
+   const q=r.indicators.quote[0],d={t:[],c:[],h:[],l:[],v:[]};
+   r.timestamp.forEach((t,i)=>{if(q.close[i]==null||q.high[i]==null||q.low[i]==null)return;d.t.push(t);d.c.push(q.close[i]);d.h.push(q.high[i]);d.l.push(q.low[i]);d.v.push(q.volume[i]||0)});
+   dropOpenBar(d,Date.now());const x=analyze(sym,d);
+   if(x.zone==='dn'&&!x.entry)x.early=h4Find(d.t.map((t,i)=>({h:d.h[i],l:d.l[i],c:d.c[i]})));
+   return x;
+  }catch(e){err=e;await sleep(800*(a+1))}
+ }
+ throw err;
+}
+async function updateSet50(){
+ const t='https://scanner.tradingview.com/thailand/scan';
+ const bodies=[
+  {symbols:{symbolset:['SYML:SET;SET50']},columns:['name'],range:[0,100]},
+  {symbols:{query:{indexes:['SET:SET50']},tickers:[]},columns:['name'],range:[0,100]}
+ ];
+ const why=[];
+ for(let i=0;i<bodies.length;i++){
+  try{
+   const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),15000);
+   const r=await fetch(PX.replace('{url}',encodeURIComponent(t)),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(bodies[i]),signal:ctl.signal});clearTimeout(to);
+   if(!r.ok){let tx='';try{tx=(await r.text()).slice(0,60)}catch(e){}why.push('แบบ'+(i+1)+': HTTP '+r.status+(tx?' '+tx:''));continue}
+   const j=await r.json();
+   const L=[...new Set((j.data||[]).map(x=>String((x.d&&x.d[0])||String(x.s||'').split(':').pop()).trim().toUpperCase()).filter(x=>/^[A-Z0-9&-]{1,10}$/.test(x)))];
+   if(L.length<45||L.length>55){why.push('แบบ'+(i+1)+': ได้ '+L.length+' ตัว (รวม '+(j.totalCount==null?'?':j.totalCount)+')');continue}
+   $('#list').value=L.join(', ');S.set('set50_time',Date.now());persist();return true;
+  }catch(e){why.push('แบบ'+(i+1)+': error '+(e&&e.message||e))}
+ }
+ return why.join(' | ');
+}
+let xd=S.get('set_xd',{});
+const bkkToday=()=>new Date(Date.now()+7*3600e3).toISOString().slice(0,10);
+const thDate=d=>new Date(d+'T00:00:00+07:00').toLocaleDateString('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'short'});
+const xdLeft=sym=>{const e=xd[sym];if(!e)return null;const n=Math.round((Date.parse(e.d+'T00:00:00Z')-Date.parse(bkkToday()+'T00:00:00Z'))/864e5);return n<0?null:n};
+const xdBadge=sym=>xdLeft(sym)==null?'':`<div class="xdb">XD ${thDate(xd[sym].d)}</div>`;
+const xdDet=sym=>{const n=xdLeft(sym);if(n==null)return '';const e=xd[sym];return `<p><b>ขึ้นเครื่องหมาย XD</b> ${thDate(e.d)} (${n===0?'วันนี้':'อีก '+n+' วัน'})${e.a!=null?' · ปันผล '+e.a+' บาท':''}</p>`};
+async function fetchXD(list){
+ try{
+  const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),15000);
+  const body=JSON.stringify({symbols:{tickers:list.map(x=>'SET:'+x)},columns:['name','dividend_ex_date_upcoming','dividend_amount_upcoming']});
+  const r=await fetch(PX.replace('{url}',encodeURIComponent('https://scanner.tradingview.com/thailand/scan')),{method:'POST',headers:{'Content-Type':'application/json'},body,signal:ctl.signal});clearTimeout(to);
+  if(!r.ok)return 'HTTP '+r.status;
+  const j=await r.json(),m={},today=bkkToday();
+  (j.data||[]).forEach(x=>{const t=x.d&&x.d[1];if(typeof t!=='number')return;const d=new Date((t+7*3600)*1000).toISOString().slice(0,10);if(d>=today)m[x.d[0]]={d,a:typeof x.d[2]==='number'?x.d[2]:null}});
+  xd=m;S.set('set_xd',xd);return true;
+ }catch(e){return 'error: '+(e&&e.message||e)}
+}
+// ---- early entry: D1 Dow breakout (HL/HH) ----
+let early=S.get('set_early',[]);
+function h4Find(B){
+ const n=B.length,SH=[],SL=[];
+ for(let i=2;i<n-2;i++){
+  if([-2,-1,1,2].every(m=>B[i].h>B[i+m].h))SH.push({i,v:B[i].h,at:i+2});
+  if([-2,-1,1,2].every(m=>B[i].l<B[i+m].l))SL.push({i,v:B[i].l,at:i+2});
+ }
+ let ev=null;
+ for(let t=6;t<n;t++){
+  const sh=[...SH].reverse().find(z=>z.at<=t);if(!sh)continue;
+  if(!(B[t].c>sh.v))continue;
+  let broke=false;for(let m=sh.i+1;m<t;m++)if(B[m].c>sh.v){broke=true;break}
+  if(broke)continue;
+  const sl1=[...SL].reverse().find(z=>z.at<=t&&z.i>sh.i),sl0=[...SL].reverse().find(z=>z.at<=t&&z.i<sh.i);
+  if(!sl1||!sl0||!(sl1.v>sl0.v))continue;
+  ev={t,entry:B[t].c,sl:sl1.v,sh:sh.v,hl0:sl0.v};
+ }
+ if(!ev||n-1-ev.t>3)return null;
+ for(let m=ev.t+1;m<n;m++)if(B[m].c<ev.sl)return null;
+ ev.ago=n-1-ev.t;ev.riskPct=(ev.entry-ev.sl)/ev.entry*100;
+ return ev.riskPct>0?ev:null;
+}
+async function scan(){
+ if(scanning)return;
+ scanning=true;setMsg('กำลังอัปเดตรายชื่อ SET50…');
+ const u50=await updateSet50();
+ const L=syms();if(!L.length){scanning=false;setMsg('ยังไม่มีรายชื่อหุ้น',1);return}
+ const n50=u50===true?'อัปเดตรายชื่อ SET50 แล้ว · ':'ใช้รายชื่อเดิม (อัปเดตจาก TradingView ไม่ได้: '+u50+') · ';
+ $('#prog').style.display='block';
+ const out=[];let done=0,q=[...L],fails=0;
+ const worker=async()=>{while(q.length){const s=q.shift();try{out.push(await load(s))}catch(e){fails++;out.push({sym:s,err:e.message||'ดึงไม่ได้'})}done++;$('#prog i').style.width=(done/L.length*100)+'%';setMsg(`กำลังสแกน ${done}/${L.length}`);await sleep(300)}};
+ await Promise.all([worker(),worker()]);
+ results=out;S.set('set_results3',results);S.set('set_time',Date.now());
+ setMsg('กำลังตรวจวัน XD…');
+ const xl=[...new Set([...out.filter(x=>!x.err&&x.entry).map(x=>x.sym),...held])];
+ const xr=xl.length?await fetchXD(xl):true;
+ const ok0=out.filter(x=>!x.err);
+ scanning=false;$('#prog').style.display='none';
+ const ok=out.filter(x=>!x.err),buys=ok.filter(x=>x.entry).length;
+ if(!ok.length)setMsg('ดึงข้อมูลไม่ได้เลย — น่าจะติดข้อจำกัดของเบราว์เซอร์ (CORS) ลองเปิดแอปใหม่อีกครั้ง',1);
+ else{const pr=[];if(u50!==true)pr.push('ใช้รายชื่อเดิม (อัปเดต SET50 ไม่ได้: '+u50+')');if(fails)pr.push(`ดึงไม่ได้ ${fails} ตัว (${out.filter(x=>x.err).map(x=>x.sym).join(', ')})`);if(xr!==true)pr.push(`ตรวจ XD ไม่ได้ (${xr})`);setMsg(pr.join(' · '),pr.length>0)}
+ render();
+}
+function setMsg(t,e){const m=$('#msg');m.textContent=t;m.className='msg'+(e?' err':'')}
+const f2=x=>x==null||isNaN(x)?'—':x.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const openK=new Set();
+function toggleRow(el,k){if(event.target.closest('.lots'))return;el.classList.toggle('open');el.classList.contains('open')?openK.add(k):openK.delete(k)}
+const A12=2/13,A26=2/27;
+const sgn=v=>(v>=0?'+':'');
+const plTxt=(price,buy,q=1)=>{const d=(price-buy)*q,pc=(price-buy)/buy*100,c=d>=0?'up':'dn';return `<span class="${c}"><span class="x">${sgn(d)}${f2(d)} (</span>${sgn(pc)}${f2(pc)}%<span class="x">)</span></span>`};
+function lotsHtml(sym,price){
+ const L=lots[sym]||[];
+ return `<div class="lots">`+L.map((o,k)=>`<div class="lot">ไม้ ${k+1}<input type="number" step="any" min="0" inputmode="decimal" value="${o.p||''}" placeholder="ราคา" data-lot="${sym}" data-i="${k}" data-f="p" aria-label="ราคาซื้อไม้ ${k+1}">×<input type="number" step="1" min="0" inputmode="numeric" value="${o.q||''}" placeholder="หุ้น" data-lot="${sym}" data-i="${k}" data-f="q" aria-label="จำนวนหุ้นไม้ ${k+1}">${price!=null&&o.p>0&&o.q>0?plTxt(price,o.p,o.q):''}<button data-del="${sym}" data-i="${k}" title="ปิดไม้นี้ (บันทึกกำไร/ขาดทุน)">×</button></div>`).join('')+`<button data-add="${sym}">+ เพิ่มไม้</button></div>`}
+const validLots=sym=>(lots[sym]||[]).filter(o=>o.p>0&&o.q>0);
+const avgOf=sym=>{const L=validLots(sym),q=L.reduce((a,o)=>a+o.q,0);return q?L.reduce((a,o)=>a+o.p*o.q,0)/q:null};
+const qtyOf=sym=>validLots(sym).reduce((a,o)=>a+o.q,0);
+const crossPx=x=>(x.e26*(1-A26)-x.e12*(1-A12))/(A12-A26);
+function rowHtml(x,isHeld){
+ const cl=x.chg>=0?'up':'dn',p=x.plan,na='<span class="na">—</span>';
+ const sell=x.zone==='dn',key=(isHeld?'p':'a')+x.sym;
+ const sig=sell?'<span class="st sell">ขาย</span>':'';
+ const sl=!isHeld?(p?`<span class="dn">${f2(p.sl)}</span> <small class="x">(-${p.riskPct.toFixed(1)}%)</small>`:x.noSwing?'<span class="na">ไม่พบ<span class="x"> swing low</span></span>':na):na;
+ const sp=sell?f2(x.sellPx!=null?x.sellPx:x.price):na;
+ const av=isHeld?avgOf(x.sym):null;
+ const c3=isHeld?(av!=null?f2(av):na):(p?f2(p.entry):na);
+ const c4=isHeld?(av!=null?plTxt(x.price,av,qtyOf(x.sym)):na):sl;
+ const l3=isHeld?'ราคาเฉลี่ย':'แนะนำ',l4=isHeld?'PnL':'ตัดขาดทุน';
+ return `<div class="r${isHeld?'':' g4'}${openK.has(key)?' open':''}" onclick="toggleRow(this,'${key}')">
+  <div class="c sym" data-l="ชื่อหุ้น"><div class="sy"><label class="ck" onclick="event.stopPropagation()" title="ติ๊กเพื่อเพิ่ม/เอาออกจาก portfolio"><input type="checkbox" data-s="${x.sym}" ${held.includes(x.sym)?'checked':''}></label><b>${x.sym}</b>&nbsp;${sig}</div>${xdBadge(x.sym)}</div>
+  ${isHeld?'':`<div class="c" data-l="ราคา">${f2(x.price)} <small class="x ${cl}">${x.chg>=0?'+':''}${f2(x.chg)} (${x.chg>=0?'+':''}${f2(x.chgPct)}%)</small></div>`}
+  <div class="c" data-l="${l3}">${c3}</div>
+  <div class="c" data-l="${l4}">${c4}</div>
+  ${isHeld?`<div class="c" data-l="ตัดขาดทุน">${x.trail?`<span class="dn">${f2(x.trail.sl)}</span> <small class="x">(-${x.trail.riskPct.toFixed(1)}%)</small>`:'<span class="na">ไม่พบ<span class="x"> swing low</span></span>'}</div>`:''}
+  ${isHeld?`<div class="c" data-l="ขาย">${sp}</div>`:''}
+  ${isHeld?lotsHtml(x.sym,x.price):''}
+  ${isHeld?`<div class="det">${xdDet(x.sym)}${x.trail?`<p>ตัดขาดทุนแบบ trailing = swing low รายวันล่าสุดที่ยืนยันแล้ว (${x.trail.ago} แท่งก่อน) · ราคาปัจจุบัน ${f2(x.price)} (${sgn(x.chg)}${f2(x.chg)} · ${sgn(x.chgPct)}${f2(x.chgPct)}%)</p>`:`<p>ราคาปัจจุบัน ${f2(x.price)}</p>`}</div>`:''}
+  ${isHeld?'':`<div class="det">
+   ${xdDet(x.sym)}
+   <p>วันนี้ ${f2(x.price)} (${sgn(x.chg)}${f2(x.chg)} · ${sgn(x.chgPct)}${f2(x.chgPct)}%)${p?` · ความเสี่ยงถึงตัดขาดทุน -${p.riskPct.toFixed(1)}%`:''}</p>
+   <p>EMA12 ${f2(x.e12)} · EMA26 ${f2(x.e26)} · MACD − Signal ${f2(x.mh)}</p>
+   <p><b>กฎเข้า</b> — EMA12 ตัดขึ้น EMA26 ที่แท่งปิด และ MACD เหนือ Signal · <b>กฎออก</b> — EMA12 ตัดลงใต้ EMA26 ตอนปิดแท่ง (ราคาขาย = ราคาปิดของแท่งที่ CDC cross ลง แสดงเมื่อ cross ลงแล้วเท่านั้น)</p>
+   ${p?`<p>ตัดขาดทุนที่ swing low ล่าสุด (ยืนยันแล้ว ${p.swingAgo} แท่งก่อน)</p>`:''}
+  </div>`}</div>`}
+function earlyRow(x,e){
+ const cl=x.chg>=0?'up':'dn',key='e'+x.sym,na='<span class="na">—</span>';
+ return `<div class="r g4${openK.has(key)?' open':''}" onclick="toggleRow(this,'${key}')">
+  <div class="c sym" data-l="ชื่อหุ้น"><div class="sy"><label class="ck" onclick="event.stopPropagation()" title="ติ๊กเพื่อเพิ่ม/เอาออกจาก portfolio"><input type="checkbox" data-s="${x.sym}" ${held.includes(x.sym)?'checked':''}></label><b>${x.sym}</b></div>${xdBadge(x.sym)}</div>
+  <div class="c" data-l="ราคา">${f2(x.price)} <small class="x ${cl}">${x.chg>=0?'+':''}${f2(x.chg)} (${x.chg>=0?'+':''}${f2(x.chgPct)}%)</small></div>
+  <div class="c" data-l="แนะนำ">${f2(e.entry)}</div>
+  <div class="c" data-l="ตัดขาดทุน"><span class="dn">${f2(e.sl)}</span> <small class="x">(-${e.riskPct.toFixed(1)}%)</small></div>
+  <div class="det">${xdDet(x.sym)}
+   <p>D1 ทะลุแนวต้าน (swing high) ${f2(e.sh)} เมื่อ ${e.ago} แท่งก่อน · ราคาแนะนำ = ราคาปิดแท่งที่ทะลุ</p>
+   <p>HL (ตัดขาดทุน) ${f2(e.sl)} สูงกว่า low ก่อนหน้า ${f2(e.hl0)} · รายวันยังไม่ cross ขึ้น</p>
+   <p><b>กฎออก</b> — ปิดรายวันต่ำกว่า HL (ตัดขาดทุน) หรือหลังรายวัน cross ขึ้นแล้วใช้กฎออกเดิม (CDC cross ลง)</p>
+  </div></div>`}
+function missRow(sym){
+ const na='<span class="na">—</span>';
+ return `<div class="r${openK.has('p'+sym)?' open':''}" onclick="toggleRow(this,'p${sym}')">
+  <div class="c sym" data-l="ชื่อหุ้น"><div class="sy"><label class="ck" title="เอาออกจาก portfolio"><input type="checkbox" data-s="${sym}" checked></label><b>${sym}</b></div>${xdBadge(sym)}</div>
+  <div class="c" data-l="ราคาเฉลี่ย">${avgOf(sym)!=null?f2(avgOf(sym)):na}</div><div class="c" data-l="PnL">${na}</div><div class="c" data-l="ตัดขาดทุน">${na}</div><div class="c" data-l="ขาย">${na}</div>${lotsHtml(sym,null)}${xdDet(sym)?`<div class="det">${xdDet(sym)}</div>`:''}</div>`}
+function render(){
+ const ok=results.filter(x=>!x.err).sort((a,b)=>a.sym.localeCompare(b.sym));
+ const by={};ok.forEach(x=>by[x.sym]=x);
+ const buys=ok.filter(x=>x.entry),hs=[...held].sort();
+ $('#nb').textContent=`(${buys.length})`;$('#nh').textContent=`(${hs.length})`;
+ const tm=S.get('set_time',0);
+ $('#asof').textContent=tm?'สแกนล่าสุด '+new Date(tm).toLocaleString('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+(ok[0]?' · ข้อมูลถึงวันที่ '+new Date(ok[0].t*1000).toLocaleDateString('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'short'}):''):'';
+ $('#out').innerHTML=buys.length?buys.map(x=>rowHtml(x,false)).join(''):`<div class="panel msg">${ok.length?'ไม่มีหุ้น':'กำลังสแกน…'}</div>`;
+ early=ok.filter(x=>x.zone==='dn'&&!x.entry&&x.early).map(x=>({sym:x.sym,...x.early}));const es=early;
+ $('#ne').textContent=`(${es.length})`;
+ $('#out3').innerHTML=es.length?es.map(e=>earlyRow(by[e.sym],e)).join(''):`<div class="panel msg">${ok.length?'ไม่มีหุ้น':'กำลังสแกน…'}</div>`;
+ {const cn=closed.length,w=closed.filter(c=>c.pnl>0).length,rl=closed.reduce((a,c)=>a+c.pnl,0);
+  let fl=0;hs.forEach(k=>{const x=by[k],av=avgOf(k);if(x&&av!=null)fl+=(x.price-av)*qtyOf(k)});
+  const cs=v=>`<b class="${v>=0?'up':'dn'}">${sgn(v)}${f2(v)}</b>`;
+  $('#pfs').innerHTML=`WR <b>${cn?Math.round(w/cn*100)+'%':'—'}</b> · PnL ${cs(rl+fl)} · Profit ${cs(rl)}`}
+ $('#out2').innerHTML=hs.length?hs.map(s=>by[s]?rowHtml(by[s],true):missRow(s)).join(''):'<div class="panel msg">ไม่มีรายการ</div>';
+}
+const saveLots=()=>persist();
+async function livePx(sym){
+ try{const j=await getJson(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}.BK?range=1d&interval=1d`);const p=j.chart.result[0].meta.regularMarketPrice;if(p>0)return p}catch(e){}
+ const r=results.find(z=>z.sym===sym&&!z.err);return r?r.price:0}
+const mkClosed=(sym,o,px)=>({sym,buy:o.p,q:o.q,sell:+px.toFixed(2),pnl:(px-o.p)*o.q,pct:(px/o.p-1)*100,ot:o.t||0,ct:Date.now()});
+document.addEventListener('change',async e=>{const t=e.target;if(!t.matches)return;
+ if(t.matches('input[data-s]')){const k=t.dataset.s;
+  if(t.checked){held=[...new Set([...held,k])];render();
+   if(!(lots[k]&&lots[k].length)){const b=await livePx(k);lots[k]=b>0?[{p:+b.toFixed(2),q:100,t:Date.now()}]:[]}
+   persist();render()}
+  else{const L=validLots(k);
+   if(L.length){const px=await livePx(k);
+    if(!(px>0)){setMsg('ดึงราคาปิดไม่ได้ ยังไม่ปิดสถานะ '+k,1);t.checked=true;return}
+    if(!confirm(`ปิดสถานะ ${k} ทั้งหมดที่ราคา ${f2(px)}?\nระบบจะบันทึกกำไร/ขาดทุนของแต่ละไม้อัตโนมัติ`)){t.checked=true;return}
+    L.forEach(o=>closed.push(mkClosed(k,o,px)))}
+   held=held.filter(x=>x!==k);delete lots[k];
+   persist();render()}}
+ else if(t.matches('input[data-lot]')){const k=t.dataset.lot,i=+t.dataset.i,v=parseFloat(t.value);lots[k][i][t.dataset.f]=v>0?v:0;saveLots();render()}});
+document.addEventListener('click',async e=>{const t=e.target.closest&&e.target.closest('button[data-add],button[data-del]');if(!t)return;
+ if(t.dataset.add){const k=t.dataset.add,b=await livePx(k);(lots[k]=lots[k]||[]).push({p:b>0?+b.toFixed(2):0,q:100,t:Date.now()})}
+ else{const k=t.dataset.del,i=+t.dataset.i,o=lots[k][i];
+  if(o&&o.p>0&&o.q>0){const px=await livePx(k);
+   if(!(px>0)){setMsg('ดึงราคาปิดไม่ได้ ยังไม่ปิดไม้นี้',1);return}
+   if(!confirm(`ปิดไม้ ${i+1} ของ ${k} ที่ราคา ${f2(px)}?`))return;
+   closed.push(mkClosed(k,o,px))}
+  lots[k].splice(i,1)}
+ saveLots();render()});
+const FB_CFG={apiKey:"AIzaSyB5ghBlNmge5A2iIDLj732oNZi-3fb1Mpo",authDomain:"setscanner-9daab.firebaseapp.com",projectId:"setscanner-9daab",storageBucket:"setscanner-9daab.firebasestorage.app",messagingSenderId:"1016866068376",appId:"1:1016866068376:web:c29876a2f6578594ce3ded"};
+let docRef=null,unsub=null,autoDone=false;
+const clearLocal=()=>['set_list','set_lots','set_held2','set_held'].forEach(k=>{try{localStorage.removeItem(k)}catch(e){}});
+function persist(){
+ if(!docRef)return Promise.resolve();
+ return docRef.set({held,lots,closed,list:$('#list').value,updated:Date.now()}).catch(e=>setMsg('บันทึกไม่สำเร็จ ('+(e.code||e.message)+')',1));
+}
+const showApp=on=>{$('#app').hidden=!on;$('#login').hidden=on};
+function startAuth(){
+ const lm=t=>{$('#lmsg').textContent=t;$('#lmsg').className='msg'+(t?' err':'')};
+ if(!window.firebase){lm('โหลด Firebase ไม่ได้ ตรวจสอบอินเทอร์เน็ตแล้วรีเฟรชหน้า');return}
+ firebase.initializeApp(FB_CFG);
+ const auth=firebase.auth(),db=firebase.firestore();
+ const prov=()=>new firebase.auth.GoogleAuthProvider();
+ $('#signin').onclick=async()=>{
+  lm('');
+  try{await auth.signInWithPopup(prov())}
+  catch(e){
+   if(e.code==='auth/popup-blocked'||e.code==='auth/operation-not-supported-in-this-environment')auth.signInWithRedirect(prov());
+   else if(e.code!=='auth/popup-closed-by-user'&&e.code!=='auth/cancelled-popup-request')lm('เข้าสู่ระบบไม่สำเร็จ ('+(e.code||e.message)+')');
+  }};
+ auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(()=>{});
+ auth.onAuthStateChanged(u=>{
+  if(unsub){unsub();unsub=null}
+  if(!u){docRef=null;showApp(false);$('#signin').disabled=false;$('#lmsg').className='msg';$('#lmsg').textContent='กรุณาเข้าสู่ระบบเพื่อใช้งาน';return}
+  docRef=db.collection('users').doc(u.uid);
+  unsub=docRef.onSnapshot(snap=>{
+   if(snap.metadata.hasPendingWrites)return;
+   if(snap.exists){
+    const d=snap.data();
+    held=Array.isArray(d.held)?d.held:[];lots=normLots(d.lots);closed=Array.isArray(d.closed)?d.closed:[];
+    if(typeof d.list==='string'&&d.list)$('#list').value=d.list;
+    clearLocal();
+   }else{persist().then(clearLocal)}
+   showApp(true);render();
+   if(!autoDone){autoDone=true;scan()}
+  },err=>{showApp(false);lm('อ่านข้อมูลไม่ได้ ('+(err.code||err.message)+') ตรวจสอบกฎ Firestore')});
+ });
+}
+const isDark=()=>{const t=document.documentElement.getAttribute('data-theme');return t?t==='dark':matchMedia('(prefers-color-scheme:dark)').matches};
+const syncTheme=()=>{$('#theme').textContent=isDark()?'☀️':'🌙'};
+$('#theme').onclick=()=>{const t=isDark()?'light':'dark';document.documentElement.setAttribute('data-theme',t);try{localStorage.setItem('set_theme',t)}catch(e){}syncTheme()};
+syncTheme();
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&autoDone&&!scanning&&Date.now()-S.get('set_time',0)>10*60*1000)scan()});
+render();
+startAuth();
+if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
