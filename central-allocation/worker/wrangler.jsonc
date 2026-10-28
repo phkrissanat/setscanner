@@ -1,23 +1,21 @@
 {
   "name": "setscanner-allocation",
   "main": "src/index.mjs",
-  "compatibility_date": "2026-10-27",
+  "compatibility_date": "2026-10-28",
   "triggers": {
-    "crons": [
-      "30 11,13 * * 1-5"
-    ]
+    "crons": []
   },
   "kv_namespaces": [
     {
       "binding": "ALLOCATION",
-      "id": "REPLACE_WITH_KV_NAMESPACE_ID"
+      "id": "ff6b9ff093b94d1283540537ad7705c5"
     }
   ],
   "vars": {
-    "PWA_ORIGIN": "REPLACE_WITH_PWA_ORIGIN",
-    "INDUSTRY_FEED_URL": "REPLACE_WITH_VERIFIED_HTTPS_FEED"
+    "PWA_ORIGIN": "https://phkrissanat.github.io"
   },
   "observability": {
     "enabled": true
-  }
+  },
+  "account_id": "7693da0db03bdf19b7b6416845fc907f"
 }
