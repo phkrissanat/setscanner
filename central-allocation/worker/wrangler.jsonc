@@ -1,9 +1,11 @@
 {
   "name": "setscanner-allocation",
-  "main": "src/index.mjs",
+  "main": "src/breadth.mjs",
   "compatibility_date": "2026-10-28",
   "triggers": {
-    "crons": []
+    "crons": [
+      "30-35 11,13 * * 1-5"
+    ]
   },
   "kv_namespaces": [
     {

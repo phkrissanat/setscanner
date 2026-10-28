@@ -1,5 +1,5 @@
 const PREFIX = 'set-scanner-' + encodeURIComponent(self.registration.scope) + '-';
-const CACHE = PREFIX + 'v3-central';
+const CACHE = PREFIX + 'v4-breadth';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'allocation.mjs'];
 const assetURLs = new Set(FILES.map(p => new URL(p, self.registration.scope).href));
 self.addEventListener('install', e => {

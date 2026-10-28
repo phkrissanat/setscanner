@@ -295,6 +295,9 @@ function h4Find(B){
 }
 let allocation=null;
 const allowed=sym=>eligible(allocation,sym);
+const escapeHTML=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function industryBadge(sym){const id=allocation?.symbols?.[sym],g=allocation?.groups?.[id];return g?'<div class="msg">'+escapeHTML(g.name)+' · '+g.up+'/'+g.total+' ขาขึ้น</div>':''}
+
 async function refreshAllocation(){
  allocation=null;
  const status=$('#allocation-status');
@@ -305,10 +308,10 @@ async function refreshAllocation(){
   const r=await fetch(endpoint,{signal:controller.signal,cache:'no-store'});
   if(!r.ok)throw Error('unavailable');
   const data=await r.json();
-  if(data.schemaVersion!==1||data.ruleVersion!=='industry-ema12-26-v1'||data.status!=='ready'||!(Date.parse(data.expiresAt)>Date.now()))throw Error('stale');
+  if(data.schemaVersion!==1||data.ruleVersion!=='industry-breadth-ema12-26-v1'||data.status!=='ready'||!(Date.parse(data.expiresAt)>Date.now()))throw Error('stale');
   allocation=data;
   const groups=Object.values(data.groups||{});
-  status.textContent='ตัวกรองอุตสาหกรรม: ผ่าน '+groups.filter(g=>g.status==='ready'&&g.eligible).length+'/'+groups.length+' กลุ่ม · อัปเดต '+new Date(data.generatedAt).toLocaleString('th-TH',{timeZone:'Asia/Bangkok'});
+  status.textContent='ความแข็งแกร่งของกลุ่มใน SET50: ผ่าน '+groups.filter(g=>g.status==='ready'&&g.eligible).length+'/'+groups.length+' กลุ่ม · อัปเดต '+new Date(data.generatedAt).toLocaleString('th-TH',{timeZone:'Asia/Bangkok'});
  }catch(e){status.textContent='ตัวกรองส่วนกลางไม่พร้อมหรือข้อมูลหมดอายุ · งดสัญญาณใหม่ แต่ติดตาม portfolio ต่อ'}finally{clearTimeout(timer)}
 }
 async function scan(){
@@ -359,7 +362,7 @@ function rowHtml(x,isHeld){
  const c4=isHeld?(av!=null?plTxt(x.price,av,qtyOf(x.sym)):na):sl;
  const l3=isHeld?'ราคาเฉลี่ย':'แนะนำ',l4=isHeld?'PnL':'ตัดขาดทุน';
  return `<div class="r${isHeld?'':' g4'}${openK.has(key)?' open':''}" onclick="toggleRow(event,this,'${key}')">
-  <div class="c sym" data-l="ชื่อหุ้น"><div class="sy"><label class="ck" onclick="event.stopPropagation()" title="ติ๊กเพื่อเพิ่ม/เอาออกจาก portfolio"><input type="checkbox" data-s="${x.sym}" ${held.includes(x.sym)?'checked':''}></label><b>${x.sym}</b>&nbsp;${sig}</div>${xdBadge(x.sym)}</div>
+  <div class="c sym" data-l="ชื่อหุ้น"><div class="sy"><label class="ck" onclick="event.stopPropagation()" title="ติ๊กเพื่อเพิ่ม/เอาออกจาก portfolio"><input type="checkbox" data-s="${x.sym}" ${held.includes(x.sym)?'checked':''}></label><b>${x.sym}</b>&nbsp;${sig}</div>${xdBadge(x.sym)}${industryBadge(x.sym)}</div>
   ${isHeld?'':`<div class="c" data-l="ราคา">${f2(x.price)} <small class="x ${cl}">${x.chg>=0?'+':''}${f2(x.chg)} (${x.chg>=0?'+':''}${f2(x.chgPct)}%)</small></div>`}
   <div class="c" data-l="${l3}">${c3}</div>
   <div class="c" data-l="${l4}">${c4}</div>
@@ -377,7 +380,7 @@ function rowHtml(x,isHeld){
 function earlyRow(x,e){
  const cl=x.chg>=0?'up':'dn',key='e'+x.sym,na='<span class="na">—</span>';
  return `<div class="r g4${openK.has(key)?' open':''}" onclick="toggleRow(event,this,'${key}')">
-  <div class="c sym" data-l="ชื่อหุ้น"><div class="sy"><label class="ck" onclick="event.stopPropagation()" title="ติ๊กเพื่อเพิ่ม/เอาออกจาก portfolio"><input type="checkbox" data-s="${x.sym}" ${held.includes(x.sym)?'checked':''}></label><b>${x.sym}</b></div>${xdBadge(x.sym)}</div>
+  <div class="c sym" data-l="ชื่อหุ้น"><div class="sy"><label class="ck" onclick="event.stopPropagation()" title="ติ๊กเพื่อเพิ่ม/เอาออกจาก portfolio"><input type="checkbox" data-s="${x.sym}" ${held.includes(x.sym)?'checked':''}></label><b>${x.sym}</b></div>${xdBadge(x.sym)}${industryBadge(x.sym)}</div>
   <div class="c" data-l="ราคา">${f2(x.price)} <small class="x ${cl}">${x.chg>=0?'+':''}${f2(x.chg)} (${x.chg>=0?'+':''}${f2(x.chgPct)}%)</small></div>
   <div class="c" data-l="แนะนำ">${f2(e.entry)}</div>
   <div class="c" data-l="ตัดขาดทุน"><span class="dn">${f2(e.sl)}</span> <small class="x">(-${e.riskPct.toFixed(1)}%)</small></div>
@@ -389,7 +392,7 @@ function earlyRow(x,e){
 function missRow(sym){
  const na='<span class="na">—</span>';
  return `<div class="r${openK.has('p'+sym)?' open':''}" onclick="toggleRow(event,this,'p${sym}')">
-  <div class="c sym" data-l="ชื่อหุ้น"><div class="sy"><label class="ck" title="เอาออกจาก portfolio"><input type="checkbox" data-s="${sym}" checked></label><b>${sym}</b></div>${xdBadge(sym)}</div>
+  <div class="c sym" data-l="ชื่อหุ้น"><div class="sy"><label class="ck" title="เอาออกจาก portfolio"><input type="checkbox" data-s="${sym}" checked></label><b>${sym}</b></div>${xdBadge(sym)}${industryBadge(sym)}</div>
   <div class="c" data-l="ราคาเฉลี่ย">${avgOf(sym)!=null?f2(avgOf(sym)):na}</div><div class="c" data-l="PnL">${na}</div><div class="c" data-l="ตัดขาดทุน">${na}</div><div class="c" data-l="ขาย">${na}</div>${lotsHtml(sym,null)}${xdDet(sym)?`<div class="det">${xdDet(sym)}</div>`:''}</div>`}
 function render(){
  const ok=results.filter(x=>!x.err).sort((a,b)=>a.sym.localeCompare(b.sym));

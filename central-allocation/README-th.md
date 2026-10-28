@@ -1,88 +1,46 @@
-# สถานะล่าสุด — 28 ตุลาคม 2026
+# SET scanner — Free allocation filter
 
-ติดตั้ง Cloudflare Worker `setscanner-allocation` ด้วยโค้ดตัวกรองจริงแล้ว ผูก KV `ALLOCATION` กับ namespace `ff6b9ff093b94d1283540537ad7705c5` และตั้ง `PWA_ORIGIN=https://phkrissanat.github.io` แล้ว
+ใช้บริการเดิมในโควตาฟรี ไม่มี paid API, subscription, token หรือการอัปเกรดแพ็กเกจ
 
-ทดสอบ `https://setscanner-allocation.phkrissanath.workers.dev/health` บนบริการจริง: ได้ `{"status":"unavailable","generatedAt":null}` แสดงว่าบริการอ่านที่เก็บผลได้ แต่ยังไม่มีผลตลาด ไม่ใช่ผลกรองพร้อมใช้งาน
+## วิธีคำนวณ
+- ประเมินหุ้น SET50 ที่ดึงจาก TradingView ผ่าน set-proxy เดิม ไม่ใช่ดัชนีอุตสาหกรรมทางการ
+- จัดอุตสาหกรรมจาก sector ของชุดข้อมูลสาธารณะ lumduan/thai-securities-data ซึ่งรวบรวมจาก SET ตรวจ metadata ไม่เกิน 7 วัน และต้องจัดกลุ่มหุ้นทุกตัวได้ครบ
+- ใช้ราคาปิดรายวัน Yahoo Finance ผ่าน proxy เดิมย้อนหลัง 6 เดือน ขั้นต่ำ 60 แท่ง ตัดแท่งที่ยังไม่ถึง 17:00 ไทยออก
+- หุ้นขาขึ้น = EMA12 > EMA26
+- กลุ่มผ่าน = หุ้นขาขึ้นอย่างน้อย 60% ของสมาชิกทั้งกลุ่ม, มีราคาวันล่าสุดเดียวกันอย่างน้อย 80%, สมาชิกขั้นต่ำ 3 ตัว
+- ไม่พบกลุ่มใน SET50 จะไม่แสดงกลุ่มนั้น; หุ้นนอก universe ไม่ผ่านสัญญาณใหม่ แต่ยังติดตาม portfolio ทุกตัว
 
-**ยังไม่ตั้ง INDUSTRY_FEED_URL และยังไม่เปิด Cron** เพราะ SET API ประวัติดัชนีตอบ 403 ทั้งตรงและผ่าน proxy เดิม ต้องเลือกแหล่งข้อมูลที่ server เรียกได้และยืนยันตารางสมาชิกหุ้นก่อน จึงจะเปิดตาราง 18:30/20:30 ไทยได้ การตั้งเวลาไว้โดยไม่มี feed จะเกิด refresh failure ทุกครั้ง จึงเก็บ `triggers.crons=[]` ให้ตรงกับ Cloudflare ขณะนี้
+## การทำงานกลาง
+Worker: https://setscanner-allocation.phkrissanath.workers.dev
+KV binding: ALLOCATION
+Cron จันทร์–ศุกร์เวลาไทย 18:30–18:35 และ 20:30–20:35 โดยแต่ละนาทีสแกนไม่เกิน 10 หุ้น รวม 6 ชุด เมื่อครบจึงเผยแพร่ snapshot
+รุ่นกฎ: industry-breadth-ema12-26-v1
 
-PWA รุ่นทดลองใต้ `central-allocation/pwa/` ชี้ endpoint จริงแล้ว แต่ production root ไม่เปลี่ยนและ PR ยังเป็น draft ส่วน proxy เดิมไม่ถูกแก้ไข
+ต่อหนึ่งรอบใช้ประมาณ 53 คำขอออกจาก allocation Worker แบ่งไม่เกิน 13 คำขอต่อ invocation (proxy แยกทำคำขอ upstream) และเขียน KV ประมาณ 9 ครั้ง รวมสองรอบต่อวันประมาณ 18 ครั้ง ต่ำกว่าโควตาฟรี KV 1,000 writes/day; ปริมาณอ่านยังขึ้นกับจำนวนผู้เปิดเว็บ
+ถ้าแหล่งฟรีล่ม/จำกัดการเข้าถึงหรือโควตาหมด ระบบต้องแสดง unavailable/หยุดรับสัญญาณใหม่ ไม่ซื้อแพ็กเกจหรือสลับใช้บริการเสียเงินอัตโนมัติ
 
-บันทึกด้านล่างเป็นรายละเอียดการออกแบบและประวัติก่อนติดตั้ง ให้ยึดสถานะล่าสุดด้านบนเมื่อข้อความขัดกัน
+GET /allocation อ่าน snapshot; GET /health ตรวจสถานะ ไม่มี public write หรือ refresh endpoint
+ปุ่ม Trigger scheduled event ใน Cloudflare Quick Edit เป็นทางทดสอบของผู้ดูแล: กดทีละชุดจนครบ 6 ครั้ง ใช้เส้นทางดึง/ตรวจข้อมูลจริงเดียวกับ Cron ไม่รับ snapshot จากเครื่องผู้ดูแล
+ผลแต่ละรอบและข้อมูลชั่วคราวแยก runId เพื่อป้องกันการปะปน; ชุดชั่วคราวหมดอายุภายใน 24 ชั่วโมง
+ผลพร้อมใช้ได้สูงสุด 72 ชั่วโมงหลังสร้างและไม่เกิน 96 ชั่วโมงหลังเวลาปิดแท่งล่าสุด เพื่อรองรับสุดสัปดาห์; วันหยุดยาวเกินเกณฑ์จะ unavailable
 
----
+## PWA
+กรองก่อนสแกนและก่อนแสดง watch list/available; หุ้นที่ถือยังแสดงและสแกนทุกตัว
+แสดงชื่อว่า ความแข็งแกร่งของกลุ่มใน SET50 และจำนวนหุ้นขาขึ้นต่อสมาชิก เพื่อไม่อ้างว่าเป็นดัชนีทั้งอุตสาหกรรม
+PWA ในโฟลเดอร์ pwa เป็นชุดที่เตรียมเผยแพร่; ดูสถานะ PR/production ก่อนคัดลอกทับเว็บ
 
-# SET scanner — ตัวกรองอุตสาหกรรมส่วนกลาง
+## ผลตรวจ
+ผ่าน regression tests ของ breadth และ PWA 26 กรณี
+ทดสอบดึงตลาดจริงจากเครื่อง: 50 หุ้น, ข้อมูลที่ใช้ได้ 49 ตัว, 3 กลุ่มผ่าน ณ ราคาปิด 27 ต.ค. 2026 (เป็นผลตรวจ ณ เวลาทดสอบ ไม่ใช่ข้อมูลสดถาวร)
+การทดสอบ Firebase login และพอร์ตบนมือถือจริงยังต้องตรวจหลังเผยแพร่
 
-สถานะ: โค้ดพร้อมทดสอบเชื่อมระบบ ยังไม่ได้ deploy และยังไม่มีแหล่งข้อมูลจริงที่เชื่อมแล้ว
+## วิธีทดสอบ
+node --test tests/breadth.test.mjs tests/pwa.test.mjs
 
-## สิ่งที่ทำแล้ว
-- Cloudflare Worker มี scheduled handler: จันทร์–ศุกร์ 18:30 และ 20:30 เวลาไทย (11:30/13:30 UTC)
-- คำนวณ EMA12 > EMA26 ของดัชนีกลุ่ม จากแท่งรายวันที่ปิดแล้วอย่างน้อย 60 แท่ง สูตรเริ่มต้น ไม่ใช่ผล backtest หรือการรับประกันกลยุทธ์
-- เก็บผลกลางใน Cloudflare KV; endpoint GET /allocation สำหรับ PWA และ /health สำหรับตรวจสถานะ
-- PWA กรองทั้งก่อนสแกนและก่อนแสดง watch list/available โดยไม่มีเมนูให้เลือก
-- หุ้นใน portfolio ยังสแกนเสมอ ไม่มีการเขียนข้อมูลส่วนบุคคลไปที่ Worker
-- ข้อมูลหาย/เก่า/ผิด schema/โหลดไม่ได้: งดสัญญาณใหม่ ไม่เปลี่ยนเป็นผ่านโดยอัตโนมัติ
-- ไม่เปลี่ยน Firebase config และไม่แตะ proxy เดิม
-
-## ข้อจำกัดที่ต้องทราบก่อนเปิดใช้
-ชุดนี้ยังไม่ใช่ระบบพร้อมใช้งานจริง: INDUSTRY_FEED_URL, KV namespace, PWA_ORIGIN และ URL endpoint ใน PWA ยังไม่ได้กำหนด
-ตัวรับข้อมูลรองรับ JSON contract ด้านล่าง แต่ยังต้องสร้าง adapter ให้แหล่งข้อมูลตลาดจริง หรือเลือกบริการที่ส่ง contract นี้ได้ ไม่ได้ใช้ URL ที่เดาจาก SET/TradingView/Yahoo
-ยังไม่ได้เชื่อมบัญชี Cloudflare หรือ GitHub และไม่ได้เปิด Cron จริง
-งานที่รันแม้ปิด PWA คือการประเมินอุตสาหกรรมเท่านั้น การสแกนสัญญาณรายหุ้นเดิมยังทำเมื่อเปิด PWA ไม่ได้เพิ่มการแจ้งเตือน push
-ยังไม่รวม section ราคาพอร์ต/น้ำหนักพอร์ตหรือ ranking ที่เคยคุยไว้
-
-## ข้อมูลที่ต้องได้ก่อน deploy
-1. URL repo และ URL GitHub Pages จริง
-2. ช่องทางเข้าบัญชี Cloudflare ที่ได้รับสิทธิ์ และโค้ด Worker เดิมหากต้องการใช้ร่วมกัน
-3. แหล่งข้อมูลดัชนีกลุ่มที่เข้าถึงได้ พร้อมตารางสมาชิกหุ้น–กลุ่มจากแหล่งเดียวกัน/วันที่ตรวจสอบแล้ว
-ไม่ต้องส่ง token หรือรหัสผ่านในแชต เก็บ FEED_TOKEN เป็น secret ผ่าน Cloudflare หากผู้ให้บริการต้องใช้
-
-## Contract ของ industry feed
-HTTPS endpoint ที่ server เรียกได้ ส่ง JSON:
-- schemaVersion: 1
-- generatedAt: ISO timestamp ของเวลาจัดทำข้อมูล (ไม่เกิน 30 ชั่วโมงและไม่เกินอนาคต 5 นาที)
-- groups: array ของกลุ่ม
-  - id: รหัสกลุ่ม A-Z, 0-9, underscore หรือ hyphen
-  - name: ชื่อกลุ่ม
-  - symbols: รายชื่อหุ้นในกลุ่ม ใช้สัญลักษณ์เดียวกับ PWA ไม่ต่อ .BK; ห้ามซ้ำข้ามกลุ่ม
-  - bars: 60–1000 แท่ง เรียงวันเก่าไปใหม่ ไม่ซ้ำ
-    - date: YYYY-MM-DD วันที่ตลาดตามเวลาไทย
-    - close: ตัวเลขบวกจำกัดค่า
-    - closed: true สำหรับแท่งปิดแล้วเท่านั้น
-ดัชนีกลุ่มต้องเป็นชุดข้อมูลที่สอดคล้องกัน ไม่ผสมราคาหุ้นตัวแทนกับดัชนีกลุ่มโดยไม่ระบุ
-ใช้ข้อมูลล่าสุดไม่เกิน 96 ชั่วโมงนับจาก 17:00 ไทยของวันแท่งล่าสุด; วันหยุดยาวอาจหยุดรับสัญญาณใหม่โดยตั้งใจ ยังไม่มีปฏิทินวันหยุดตลาด
-ผลคำนวณหมดอายุหลัง 30 ชั่วโมง; Cron วันศุกร์จึงอาจหมดอายุช่วงสุดสัปดาห์ และกลับมาหลังรันสำเร็จครั้งถัดไป
-KV เป็น eventually consistent จึงอาจเห็นผลรอบก่อนชั่วครู่ แต่ตรวจวันหมดอายุทั้ง server/client
-
-## ขั้นตอนนำขึ้นระบบ (หลังยืนยันข้อมูลครบ)
-1. ใช้ Wrangler CLI ในสภาพแวดล้อมที่ติดตั้งและล็อกอินแล้ว สร้าง KV namespace สำหรับ ALLOCATION
-2. ใส่ namespace ID, PWA_ORIGIN เช่น https://USER.github.io (ไม่มี path), และ INDUSTRY_FEED_URL จริงใน worker/wrangler.jsonc
-3. ถ้าต้องใช้ secret ตั้ง FEED_TOKEN ด้วย Wrangler secret หรือ Cloudflare dashboard
-4. deploy เป็น Worker ใหม่ชื่อ setscanner-allocation เพื่อไม่เขียนทับ proxy เดิม
-5. ทดสอบ scheduled invocation และตรวจ /health กับ /allocation ให้ได้ ready จากข้อมูลจริงก่อน
-6. ใส่ https://WORKER_HOST/allocation ใน meta allocation-endpoint ของ pwa/index.html
-7. นำไฟล์ทั้งหมดใน pwa/ ขึ้นโฟลเดอร์เผยแพร่ GitHub Pages เดิม (รวม allocation.mjs)
-8. ยืนยัน login, พอร์ต, ตัวกรอง, อัปเดต service worker และ Cron execution logs บนมือถือจริง
-อย่าอัปโหลด pwa/ ชุดนี้ทับเว็บจริงก่อนตั้ง endpoint เพราะมันจะงดสัญญาณเข้าใหม่เมื่อยังไม่เชื่อมข้อมูลกลาง
-
-## ทดสอบ
-ใช้ Node.js 24: node --test tests/allocation.test.mjs จากโฟลเดอร์นี้
-ผลในเครื่อง: ผ่าน 20 tests และ syntax ของ JavaScript ใน PWA/service worker
-ทดสอบด้วยข้อมูลสังเคราะห์และ mock fetch/KV; ไม่ใช่การทดสอบราคาตลาดจริง Cloudflare จริง หรือ mobile browser
-
-## อ้างอิง
-https://developers.cloudflare.com/workers/configuration/cron-triggers/
-https://developers.cloudflare.com/workers/wrangler/configuration/
+## แหล่งข้อมูลและข้อจำกัด
+https://github.com/lumduan/thai-securities-data
 https://www.set.or.th/en/market/index/set/industry-sector-profile
-
-## สถานะบน GitHub
-ชุดนี้อยู่ใต้ central-allocation/ ใน Draft PR; ไฟล์เว็บที่ root ไม่เปลี่ยน ต้องเชื่อม feed และ Cloudflare ก่อนนำ PWA ชุดทดลองมาแทน root
-
-## ตรวจระบบจริง 28 ตุลาคม 2026
-- เข้าบัญชี Cloudflare ได้ พบ Worker เดิม set-proxy (ไม่มี bindings) และไม่ได้แก้ไขโค้ดเดิม
-- ตรวจ API ที่หน้า SET ใช้จริงจากสคริปต์ของ SET: /api/set/index/{index}/chart-quotation?period=1Y&lang=en และ /api/set/index/{index}/composition?lang=en
-- ทดสอบ chart-quotation ของ AGRO: HTTP 403 ทั้งเรียกตรงและผ่าน proxy เดิม จึงยังไม่ได้ตรวจ schema ของ response ข้อมูลจริง และยังใช้เป็น feed ไม่ได้
-- ไม่ใช้ข้อมูลสังเคราะห์แทนข้อมูลตลาดจริง และไม่มีการนำผลกรองเข้า production
-- Cloudflare ขั้นสร้าง Worker เริ่มด้วย Hello World; การกด Deploy ถูกระบบอนุมัติอัตโนมัติปฏิเสธเพราะเป็นการสร้างทรัพยากรถาวรด้วย placeholder จึงยังไม่ได้สร้าง Worker, KV หรือเปิด Cron
-- ขั้นถัดไป: ยืนยันการสร้าง Worker เพื่อใส่โค้ดที่เตรียมไว้และผูก KV; จัดหา feed ดัชนีกลุ่มที่เรียกจาก server ได้จริงก่อนเปิดใช้การกรอง
+https://developers.cloudflare.com/workers/platform/limits/
+https://developers.cloudflare.com/kv/platform/limits/
+ชุดข้อมูลสมาชิกจากผู้รวบรวมภายนอกอาจผิดพลาดได้; มีการตรวจรูปแบบ อายุ และความครบถ้วน แต่ไม่ได้รับประกันเทียบตรงจาก SET ทุกครั้ง
+Yahoo และ TradingView ที่ proxy เดิมเรียกเป็นแหล่งสาธารณะที่ไม่มี SLA; การทดสอบว่าเรียกได้ไม่ใช่การรับรองสิทธิ์เผยแพร่ข้อมูลราคาเชิงพาณิชย์
