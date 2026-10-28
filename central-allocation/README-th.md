@@ -64,3 +64,11 @@ https://www.set.or.th/en/market/index/set/industry-sector-profile
 
 ## สถานะบน GitHub
 ชุดนี้อยู่ใต้ central-allocation/ ใน Draft PR; ไฟล์เว็บที่ root ไม่เปลี่ยน ต้องเชื่อม feed และ Cloudflare ก่อนนำ PWA ชุดทดลองมาแทน root
+
+## ตรวจระบบจริง 28 ตุลาคม 2026
+- เข้าบัญชี Cloudflare ได้ พบ Worker เดิม set-proxy (ไม่มี bindings) และไม่ได้แก้ไขโค้ดเดิม
+- ตรวจ API ที่หน้า SET ใช้จริงจากสคริปต์ของ SET: /api/set/index/{index}/chart-quotation?period=1Y&lang=en และ /api/set/index/{index}/composition?lang=en
+- ทดสอบ chart-quotation ของ AGRO: HTTP 403 ทั้งเรียกตรงและผ่าน proxy เดิม จึงยังไม่ได้ตรวจ schema ของ response ข้อมูลจริง และยังใช้เป็น feed ไม่ได้
+- ไม่ใช้ข้อมูลสังเคราะห์แทนข้อมูลตลาดจริง และไม่มีการนำผลกรองเข้า production
+- Cloudflare ขั้นสร้าง Worker เริ่มด้วย Hello World; การกด Deploy ถูกระบบอนุมัติอัตโนมัติปฏิเสธเพราะเป็นการสร้างทรัพยากรถาวรด้วย placeholder จึงยังไม่ได้สร้าง Worker, KV หรือเปิด Cron
+- ขั้นถัดไป: ยืนยันการสร้าง Worker เพื่อใส่โค้ดที่เตรียมไว้และผูก KV; จัดหา feed ดัชนีกลุ่มที่เรียกจาก server ได้จริงก่อนเปิดใช้การกรอง
