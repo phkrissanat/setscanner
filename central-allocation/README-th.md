@@ -13,6 +13,7 @@
 ## การทำงานกลาง
 Worker: https://setscanner-allocation.phkrissanath.workers.dev
 KV binding: ALLOCATION
+Service binding: PROXY → set-proxy (Worker เรียกกันภายใน Cloudflare)
 Cron จันทร์–ศุกร์เวลาไทย 18:30–18:35 และ 20:30–20:35 โดยแต่ละนาทีสแกนไม่เกิน 10 หุ้น รวม 6 ชุด เมื่อครบจึงเผยแพร่ snapshot
 รุ่นกฎ: industry-breadth-ema12-26-v1
 
@@ -27,10 +28,11 @@ GET /allocation อ่าน snapshot; GET /health ตรวจสถานะ �
 ## PWA
 กรองก่อนสแกนและก่อนแสดง watch list/available; หุ้นที่ถือยังแสดงและสแกนทุกตัว
 แสดงชื่อว่า ความแข็งแกร่งของกลุ่มใน SET50 และจำนวนหุ้นขาขึ้นต่อสมาชิก เพื่อไม่อ้างว่าเป็นดัชนีทั้งอุตสาหกรรม
-PWA ในโฟลเดอร์ pwa เป็นชุดที่เตรียมเผยแพร่; ดูสถานะ PR/production ก่อนคัดลอกทับเว็บ
+ไฟล์ PWA ที่ root ของ repo คือเว็บ production; pwa เป็นสำเนาสำหรับทดสอบ
 
 ## ผลตรวจ
 ผ่าน regression tests ของ breadth และ PWA 26 กรณี
+ทดสอบ Worker บน Cloudflare ครบ 6 ชุดและ /health พร้อมใช้งานวันที่ 28 ต.ค. 2026
 ทดสอบดึงตลาดจริงจากเครื่อง: 50 หุ้น, ข้อมูลที่ใช้ได้ 49 ตัว, 3 กลุ่มผ่าน ณ ราคาปิด 27 ต.ค. 2026 (เป็นผลตรวจ ณ เวลาทดสอบ ไม่ใช่ข้อมูลสดถาวร)
 การทดสอบ Firebase login และพอร์ตบนมือถือจริงยังต้องตรวจหลังเผยแพร่
 

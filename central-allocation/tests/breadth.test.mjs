@@ -32,7 +32,9 @@ test('Read API has no public write route',async()=>assert.equal((await worker.fe
 test('Health serves current rule only',async()=>{const f=fixture(),s=summarize(f.run,f.chunks,Date.now());const r=await worker.fetch(new Request('https://test/health'),{ALLOCATION:{get:async()=>s}});assert.equal((await r.json()).ruleVersion,RULE)});
 test('Admin schedule calls fetch and validates six batches before publishing',async()=>{
  const f=universeInput(),map=new Map(),env={ALLOCATION:{put:async(k,v)=>map.set(k,JSON.parse(v)),get:async k=>map.get(k)??null}},old=globalThis.fetch;
- let calls=0;
- globalThis.fetch=async url=>{calls++;const target=String(url);if(target.endsWith('metadata_en.json'))return Response.json(f.metadata);if(target.endsWith('compact_en.json'))return Response.json(f.rows);const upstream=new URL(target).searchParams.get('url');if(upstream.includes('tradingview'))return Response.json(f.tv);const symbol=decodeURIComponent(upstream.split('/chart/')[1].split('.BK')[0]);return Response.json(chart(symbol))};
- try{for(let i=0;i<6;i++){await handleSchedule({scheduledTime:now,cron:''},env,now+i*60000);if(i<5)assert.notEqual(map.get('latest').status,'ready')}assert.equal(calls,53);assert.equal(map.get('latest').ruleVersion,RULE);assert.equal(map.get('latest').status,'ready');assert.equal(map.get('admin:cursor').next,6)}finally{globalThis.fetch=old}
+ let calls=0,serviceCalls=0;
+ const respond=async url=>{calls++;const target=String(url);if(target.endsWith('metadata_en.json'))return Response.json(f.metadata);if(target.endsWith('compact_en.json'))return Response.json(f.rows);const upstream=new URL(target).searchParams.get('url');if(upstream.includes('tradingview'))return Response.json(f.tv);const symbol=decodeURIComponent(upstream.split('/chart/')[1].split('.BK')[0]);return Response.json(chart(symbol))};
+ globalThis.fetch=async(url,opts)=>{assert.equal(opts.redirect,'manual');assert.equal(String(url).includes('workers.dev'),false);return respond(url)};
+ env.PROXY={fetch:async(url,opts)=>{serviceCalls++;assert.equal(opts.redirect,'manual');return respond(url)}};
+ try{for(let i=0;i<6;i++){await handleSchedule({scheduledTime:now,cron:''},env,now+i*60000);if(i<5)assert.notEqual(map.get('latest').status,'ready')}assert.equal(calls,53);assert.equal(serviceCalls,51);assert.equal(map.get('latest').ruleVersion,RULE);assert.equal(map.get('latest').status,'ready');assert.equal(map.get('admin:cursor').next,6)}finally{globalThis.fetch=old}
 });

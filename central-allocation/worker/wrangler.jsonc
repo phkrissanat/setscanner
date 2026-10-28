@@ -19,5 +19,11 @@
   "observability": {
     "enabled": true
   },
-  "account_id": "7693da0db03bdf19b7b6416845fc907f"
+  "account_id": "7693da0db03bdf19b7b6416845fc907f",
+  "services": [
+    {
+      "binding": "PROXY",
+      "service": "set-proxy"
+    }
+  ]
 }

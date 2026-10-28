@@ -11,6 +11,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="SET scanner">
 <title>SET scanner</title>
+<meta name="allocation-endpoint" content="https://setscanner-allocation.phkrissanath.workers.dev/allocation">
 <style>
 :root{--bg:#f4f6f8;--card:#fff;--tx:#1b2430;--mut:#566170;--bd:#c9d1da;--up:#087a43;--dn:#c42b2b;--ac:#1d4ed8;--warn:#8a5a00;--xd:#8a5200;--xdbg:rgba(180,100,0,.14);--pri:#fff;--upbg:#e3f6ec;--dnbg:#fde8e8;--wbg:#fff3d6;--nbg:#eef1f4}
 @media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0f141b;--card:#18202a;--tx:#e6ebf1;--mut:#9aa6b5;--bd:#2f3b49;--up:#2fd17f;--dn:#ff7b7b;--ac:#6ba3ff;--warn:#ffb020;--xd:#fbbf24;--xdbg:rgba(245,158,11,.18);--pri:#0b1220;--upbg:#12352a;--dnbg:#3b1d1f;--wbg:#3a2e10;--nbg:#222c38}}
@@ -126,6 +127,7 @@ small{font-size:12px}
   </div>
   <div class="prog" id="prog"><i></i></div>
   <div class="msg" id="msg"></div>
+  <div class="msg" id="allocation-status" role="status">กำลังตรวจตัวกรองอุตสาหกรรม…</div>
   <textarea id="list" hidden></textarea>
  </div>
 
@@ -152,7 +154,8 @@ small{font-size:12px}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script>
+<script type="module">
+import {eligible, candidates} from "./allocation.mjs";
 //#pure-start
 function ema(a,n){const o=Array(a.length).fill(null),k=2/(n+1);let p=0,s=0;for(let i=0;i<a.length;i++){if(i<n-1){s+=a[i];continue}if(i===n-1){s+=a[i];p=s/n;o[i]=p;continue}p=a[i]*k+p*(1-k);o[i]=p}return o}
 function macd(c){const a=ema(c,12),b=ema(c,26),line=c.map((_,i)=>b[i]==null?null:a[i]-b[i]);const f=line.findIndex(v=>v!=null),sig=Array(c.length).fill(null);if(f>=0)ema(line.slice(f),9).forEach((v,j)=>sig[f+j]=v);return{line,sig}}
@@ -209,8 +212,8 @@ async function getJson(url){
  let last;
  for(let k=0;k<t.length;k++){
   const idx=(good+k)%t.length,ac=new AbortController(),to=setTimeout(()=>ac.abort(),15000);
-  try{const res=await fetch(t[idx](url),{signal:ac.signal});clearTimeout(to);if(!res.ok)throw new Error('HTTP '+res.status);const j=await res.json();good=idx;return j}
-  catch(e){clearTimeout(to);last=e}
+  try{const res=await fetch(t[idx](url),{signal:ac.signal});if(!res.ok)throw new Error('HTTP '+res.status);const j=await res.json();good=idx;return j}
+  catch(e){last=e}finally{clearTimeout(to)}
  }
  throw last||new Error('fetch failed');
 }
@@ -290,19 +293,40 @@ function h4Find(B){
  ev.ago=n-1-ev.t;ev.riskPct=(ev.entry-ev.sl)/ev.entry*100;
  return ev.riskPct>0?ev:null;
 }
+let allocation=null;
+const allowed=sym=>eligible(allocation,sym);
+const escapeHTML=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function industryBadge(sym){const id=allocation?.symbols?.[sym],g=allocation?.groups?.[id];return g?'<div class="msg">'+escapeHTML(g.name)+' · '+g.up+'/'+g.total+' ขาขึ้น</div>':''}
+
+async function refreshAllocation(){
+ allocation=null;
+ const status=$('#allocation-status');
+ const endpoint=document.querySelector('meta[name="allocation-endpoint"]').content;
+ if(!endpoint){status.textContent='ยังไม่ได้เชื่อมตัวกรองส่วนกลาง · งดสัญญาณใหม่ แต่ติดตาม portfolio ต่อ';return}
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+ try{
+  const r=await fetch(endpoint,{signal:controller.signal,cache:'no-store'});
+  if(!r.ok)throw Error('unavailable');
+  const data=await r.json();
+  if(data.schemaVersion!==1||data.ruleVersion!=='industry-breadth-ema12-26-v1'||data.status!=='ready'||!(Date.parse(data.expiresAt)>Date.now()))throw Error('stale');
+  allocation=data;
+  const groups=Object.values(data.groups||{});
+  status.textContent='ความแข็งแกร่งของกลุ่มใน SET50: ผ่าน '+groups.filter(g=>g.status==='ready'&&g.eligible).length+'/'+groups.length+' กลุ่ม · อัปเดต '+new Date(data.generatedAt).toLocaleString('th-TH',{timeZone:'Asia/Bangkok'});
+ }catch(e){status.textContent='ตัวกรองส่วนกลางไม่พร้อมหรือข้อมูลหมดอายุ · งดสัญญาณใหม่ แต่ติดตาม portfolio ต่อ'}finally{clearTimeout(timer)}
+}
 async function scan(){
  if(scanning)return;
- scanning=true;setMsg('กำลังอัปเดตรายชื่อ SET50…');
+ scanning=true;try{setMsg('กำลังตรวจตัวกรองอุตสาหกรรม…');await refreshAllocation();render();setMsg('กำลังอัปเดตรายชื่อ SET50…');
  const u50=await updateSet50();
- const L=syms();if(!L.length){scanning=false;setMsg('ยังไม่มีรายชื่อหุ้น',1);return}
+ const L=candidates(parse($('#list').value),held,allocation);if(!L.length){scanning=false;setMsg('ไม่มีหุ้นผ่านตัวกรองหรือยังไม่มีข้อมูลกลุ่มที่ใช้ได้');render();return}
  const n50=u50===true?'อัปเดตรายชื่อ SET50 แล้ว · ':'ใช้รายชื่อเดิม (อัปเดตจาก TradingView ไม่ได้: '+u50+') · ';
  $('#prog').style.display='block';
  const out=[];let done=0,q=[...L],fails=0;
- const worker=async()=>{while(q.length){const s=q.shift();try{out.push(await load(s))}catch(e){fails++;out.push({sym:s,err:e.message||'ดึงไม่ได้'})}done++;$('#prog i').style.width=(done/L.length*100)+'%';setMsg(`กำลังสแกน ${done}/${L.length}`);await sleep(300)}};
+ const worker=async()=>{while(q.length){const s=q.shift();try{const item=await load(s);if(item.err)fails++;out.push(item)}catch(e){fails++;out.push({sym:s,err:e.message||'ดึงไม่ได้'})}done++;$('#prog i').style.width=(done/L.length*100)+'%';setMsg(`กำลังสแกน ${done}/${L.length}`);await sleep(300)}};
  await Promise.all([worker(),worker()]);
  results=out;S.set('set_results3',results);S.set('set_time',Date.now());
  setMsg('กำลังตรวจวัน XD…');
- const xl=[...new Set([...out.filter(x=>!x.err&&x.entry).map(x=>x.sym),...held])];
+ const xl=[...new Set([...out.filter(x=>!x.err&&(x.entry||x.early)).map(x=>x.sym),...held])];
  const xr=xl.length?await fetchXD(xl):true;
  const ok0=out.filter(x=>!x.err);
  scanning=false;$('#prog').style.display='none';
@@ -310,11 +334,13 @@ async function scan(){
  if(!ok.length)setMsg('ดึงข้อมูลไม่ได้เลย — น่าจะติดข้อจำกัดของเบราว์เซอร์ (CORS) ลองเปิดแอปใหม่อีกครั้ง',1);
  else{const pr=[];if(u50!==true)pr.push('ใช้รายชื่อเดิม (อัปเดต SET50 ไม่ได้: '+u50+')');if(fails)pr.push(`ดึงไม่ได้ ${fails} ตัว (${out.filter(x=>x.err).map(x=>x.sym).join(', ')})`);if(xr!==true)pr.push(`ตรวจ XD ไม่ได้ (${xr})`);setMsg(pr.join(' · '),pr.length>0)}
  render();
+ }catch(e){setMsg('สแกนไม่สำเร็จ ('+(e.message||e)+')',1)}finally{scanning=false;$('#prog').style.display='none'}
 }
 function setMsg(t,e){const m=$('#msg');m.textContent=t;m.className='msg'+(e?' err':'')}
 const f2=x=>x==null||isNaN(x)?'—':x.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 const openK=new Set();
-function toggleRow(el,k){if(event.target.closest('.lots'))return;el.classList.toggle('open');el.classList.contains('open')?openK.add(k):openK.delete(k)}
+function toggleRow(ev,el,k){if(ev.target.closest('.lots,.ck'))return;el.classList.toggle('open');el.classList.contains('open')?openK.add(k):openK.delete(k)}
+window.toggleRow=toggleRow;
 const A12=2/13,A26=2/27;
 const sgn=v=>(v>=0?'+':'');
 const plTxt=(price,buy,q=1)=>{const d=(price-buy)*q,pc=(price-buy)/buy*100,c=d>=0?'up':'dn';return `<span class="${c}"><span class="x">${sgn(d)}${f2(d)} (</span>${sgn(pc)}${f2(pc)}%<span class="x">)</span></span>`};
@@ -335,8 +361,8 @@ function rowHtml(x,isHeld){
  const c3=isHeld?(av!=null?f2(av):na):(p?f2(p.entry):na);
  const c4=isHeld?(av!=null?plTxt(x.price,av,qtyOf(x.sym)):na):sl;
  const l3=isHeld?'ราคาเฉลี่ย':'แนะนำ',l4=isHeld?'PnL':'ตัดขาดทุน';
- return `<div class="r${isHeld?'':' g4'}${openK.has(key)?' open':''}" onclick="toggleRow(this,'${key}')">
-  <div class="c sym" data-l="ชื่อหุ้น"><div class="sy"><label class="ck" onclick="event.stopPropagation()" title="ติ๊กเพื่อเพิ่ม/เอาออกจาก portfolio"><input type="checkbox" data-s="${x.sym}" ${held.includes(x.sym)?'checked':''}></label><b>${x.sym}</b>&nbsp;${sig}</div>${xdBadge(x.sym)}</div>
+ return `<div class="r${isHeld?'':' g4'}${openK.has(key)?' open':''}" onclick="toggleRow(event,this,'${key}')">
+  <div class="c sym" data-l="ชื่อหุ้น"><div class="sy"><label class="ck" onclick="event.stopPropagation()" title="ติ๊กเพื่อเพิ่ม/เอาออกจาก portfolio"><input type="checkbox" data-s="${x.sym}" ${held.includes(x.sym)?'checked':''}></label><b>${x.sym}</b>&nbsp;${sig}</div>${xdBadge(x.sym)}${industryBadge(x.sym)}</div>
   ${isHeld?'':`<div class="c" data-l="ราคา">${f2(x.price)} <small class="x ${cl}">${x.chg>=0?'+':''}${f2(x.chg)} (${x.chg>=0?'+':''}${f2(x.chgPct)}%)</small></div>`}
   <div class="c" data-l="${l3}">${c3}</div>
   <div class="c" data-l="${l4}">${c4}</div>
@@ -353,8 +379,8 @@ function rowHtml(x,isHeld){
   </div>`}</div>`}
 function earlyRow(x,e){
  const cl=x.chg>=0?'up':'dn',key='e'+x.sym,na='<span class="na">—</span>';
- return `<div class="r g4${openK.has(key)?' open':''}" onclick="toggleRow(this,'${key}')">
-  <div class="c sym" data-l="ชื่อหุ้น"><div class="sy"><label class="ck" onclick="event.stopPropagation()" title="ติ๊กเพื่อเพิ่ม/เอาออกจาก portfolio"><input type="checkbox" data-s="${x.sym}" ${held.includes(x.sym)?'checked':''}></label><b>${x.sym}</b></div>${xdBadge(x.sym)}</div>
+ return `<div class="r g4${openK.has(key)?' open':''}" onclick="toggleRow(event,this,'${key}')">
+  <div class="c sym" data-l="ชื่อหุ้น"><div class="sy"><label class="ck" onclick="event.stopPropagation()" title="ติ๊กเพื่อเพิ่ม/เอาออกจาก portfolio"><input type="checkbox" data-s="${x.sym}" ${held.includes(x.sym)?'checked':''}></label><b>${x.sym}</b></div>${xdBadge(x.sym)}${industryBadge(x.sym)}</div>
   <div class="c" data-l="ราคา">${f2(x.price)} <small class="x ${cl}">${x.chg>=0?'+':''}${f2(x.chg)} (${x.chg>=0?'+':''}${f2(x.chgPct)}%)</small></div>
   <div class="c" data-l="แนะนำ">${f2(e.entry)}</div>
   <div class="c" data-l="ตัดขาดทุน"><span class="dn">${f2(e.sl)}</span> <small class="x">(-${e.riskPct.toFixed(1)}%)</small></div>
@@ -365,20 +391,20 @@ function earlyRow(x,e){
   </div></div>`}
 function missRow(sym){
  const na='<span class="na">—</span>';
- return `<div class="r${openK.has('p'+sym)?' open':''}" onclick="toggleRow(this,'p${sym}')">
-  <div class="c sym" data-l="ชื่อหุ้น"><div class="sy"><label class="ck" title="เอาออกจาก portfolio"><input type="checkbox" data-s="${sym}" checked></label><b>${sym}</b></div>${xdBadge(sym)}</div>
+ return `<div class="r${openK.has('p'+sym)?' open':''}" onclick="toggleRow(event,this,'p${sym}')">
+  <div class="c sym" data-l="ชื่อหุ้น"><div class="sy"><label class="ck" title="เอาออกจาก portfolio"><input type="checkbox" data-s="${sym}" checked></label><b>${sym}</b></div>${xdBadge(sym)}${industryBadge(sym)}</div>
   <div class="c" data-l="ราคาเฉลี่ย">${avgOf(sym)!=null?f2(avgOf(sym)):na}</div><div class="c" data-l="PnL">${na}</div><div class="c" data-l="ตัดขาดทุน">${na}</div><div class="c" data-l="ขาย">${na}</div>${lotsHtml(sym,null)}${xdDet(sym)?`<div class="det">${xdDet(sym)}</div>`:''}</div>`}
 function render(){
  const ok=results.filter(x=>!x.err).sort((a,b)=>a.sym.localeCompare(b.sym));
  const by={};ok.forEach(x=>by[x.sym]=x);
- const buys=ok.filter(x=>x.entry),hs=[...held].sort();
+ const buys=ok.filter(x=>x.entry&&allowed(x.sym)),hs=[...held].sort();
  $('#nb').textContent=`(${buys.length})`;$('#nh').textContent=`(${hs.length})`;
  const tm=S.get('set_time',0);
  $('#asof').textContent=tm?'สแกนล่าสุด '+new Date(tm).toLocaleString('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+(ok[0]?' · ข้อมูลถึงวันที่ '+new Date(ok[0].t*1000).toLocaleDateString('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'short'}):''):'';
- $('#out').innerHTML=buys.length?buys.map(x=>rowHtml(x,false)).join(''):`<div class="panel msg">${ok.length?'ไม่มีหุ้น':'กำลังสแกน…'}</div>`;
- early=ok.filter(x=>x.zone==='dn'&&!x.entry&&x.early).map(x=>({sym:x.sym,...x.early}));const es=early;
+ $('#out').innerHTML=buys.length?buys.map(x=>rowHtml(x,false)).join(''):`<div class="panel msg">${ok.length?'ไม่มีหุ้น':scanning?'กำลังสแกน…':'ยังไม่มีข้อมูลที่ใช้ได้'}</div>`;
+ early=ok.filter(x=>x.zone==='dn'&&!x.entry&&x.early&&allowed(x.sym)).map(x=>({sym:x.sym,...x.early}));const es=early;
  $('#ne').textContent=`(${es.length})`;
- $('#out3').innerHTML=es.length?es.map(e=>earlyRow(by[e.sym],e)).join(''):`<div class="panel msg">${ok.length?'ไม่มีหุ้น':'กำลังสแกน…'}</div>`;
+ $('#out3').innerHTML=es.length?es.map(e=>earlyRow(by[e.sym],e)).join(''):`<div class="panel msg">${ok.length?'ไม่มีหุ้น':scanning?'กำลังสแกน…':'ยังไม่มีข้อมูลที่ใช้ได้'}</div>`;
  {const cn=closed.length,w=closed.filter(c=>c.pnl>0).length,rl=closed.reduce((a,c)=>a+c.pnl,0);
   let fl=0;hs.forEach(k=>{const x=by[k],av=avgOf(k);if(x&&av!=null)fl+=(x.price-av)*qtyOf(k)});
   const cs=v=>`<b class="${v>=0?'up':'dn'}">${sgn(v)}${f2(v)}</b>`;
@@ -413,11 +439,18 @@ document.addEventListener('click',async e=>{const t=e.target.closest&&e.target.c
   lots[k].splice(i,1)}
  saveLots();render()});
 const FB_CFG={apiKey:"AIzaSyB5ghBlNmge5A2iIDLj732oNZi-3fb1Mpo",authDomain:"setscanner-9daab.firebaseapp.com",projectId:"setscanner-9daab",storageBucket:"setscanner-9daab.firebasestorage.app",messagingSenderId:"1016866068376",appId:"1:1016866068376:web:c29876a2f6578594ce3ded"};
-let docRef=null,unsub=null,autoDone=false;
+let docRef=null,unsub=null,autoDone=false,activeUid=null,authEpoch=0;
+async function initializeUser(ref,db,epoch){
+ try{
+  const initial={held,lots,closed,list:$('#list').value,updated:Date.now()};
+  await db.runTransaction(async tx=>{const current=await tx.get(ref);if(!current.exists)tx.set(ref,initial)});
+  // Keep legacy local data as a backup; its account owner is unknown.
+ }catch(e){if(epoch===authEpoch)setMsg('สร้างข้อมูลไม่สำเร็จ ('+(e.code||e.message)+')',1)}
+}
 const clearLocal=()=>['set_list','set_lots','set_held2','set_held'].forEach(k=>{try{localStorage.removeItem(k)}catch(e){}});
 function persist(){
  if(!docRef)return Promise.resolve();
- return docRef.set({held,lots,closed,list:$('#list').value,updated:Date.now()}).catch(e=>setMsg('บันทึกไม่สำเร็จ ('+(e.code||e.message)+')',1));
+ return docRef.set({held,lots,closed,list:$('#list').value,updated:Date.now()}, {merge:true}).then(()=>true).catch(e=>{setMsg('บันทึกไม่สำเร็จ ('+(e.code||e.message)+') กรุณาลองอีกครั้ง',1);return false});
 }
 const showApp=on=>{$('#app').hidden=!on;$('#login').hidden=on};
 function startAuth(){
@@ -430,22 +463,28 @@ function startAuth(){
   lm('');
   try{await auth.signInWithPopup(prov())}
   catch(e){
-   if(e.code==='auth/popup-blocked'||e.code==='auth/operation-not-supported-in-this-environment')auth.signInWithRedirect(prov());
+   if(e.code==='auth/popup-blocked'||e.code==='auth/operation-not-supported-in-this-environment'){try{await auth.signInWithRedirect(prov())}catch(re){lm('เข้าสู่ระบบแบบ redirect ไม่สำเร็จ ('+(re.code||re.message)+')')}}
    else if(e.code!=='auth/popup-closed-by-user'&&e.code!=='auth/cancelled-popup-request')lm('เข้าสู่ระบบไม่สำเร็จ ('+(e.code||e.message)+')');
   }};
- auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(()=>{});
+ auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(e=>lm('ตั้งค่าการจำการเข้าสู่ระบบไม่ได้ ('+(e.code||e.message)+')'));
+ auth.getRedirectResult().catch(e=>lm('เข้าสู่ระบบแบบ redirect ไม่สำเร็จ ('+(e.code||e.message)+')'));
  auth.onAuthStateChanged(u=>{
+  const epoch=++authEpoch;
+  if(activeUid!==(u&&u.uid)){held=[];lots={};closed=[];$('#list').value=DEF.replace(/,/g,', ');autoDone=false}
+  activeUid=u&&u.uid;
   if(unsub){unsub();unsub=null}
   if(!u){docRef=null;showApp(false);$('#signin').disabled=false;$('#lmsg').className='msg';$('#lmsg').textContent='กรุณาเข้าสู่ระบบเพื่อใช้งาน';return}
   docRef=db.collection('users').doc(u.uid);
-  unsub=docRef.onSnapshot(snap=>{
-   if(snap.metadata.hasPendingWrites)return;
+  const userRef=docRef;let initializing=false;
+  unsub=userRef.onSnapshot({includeMetadataChanges:true},snap=>{
+   if(epoch!==authEpoch||snap.metadata.hasPendingWrites)return;
+   if(!snap.exists&&snap.metadata.fromCache)return;
    if(snap.exists){
     const d=snap.data();
     held=Array.isArray(d.held)?d.held:[];lots=normLots(d.lots);closed=Array.isArray(d.closed)?d.closed:[];
     if(typeof d.list==='string'&&d.list)$('#list').value=d.list;
-    clearLocal();
-   }else{persist().then(clearLocal)}
+    // Do not delete unscoped legacy local data automatically.
+   }else{if(!initializing){initializing=true;initializeUser(userRef,db,epoch).finally(()=>{initializing=false})}return}
    showApp(true);render();
    if(!autoDone){autoDone=true;scan()}
   },err=>{showApp(false);lm('อ่านข้อมูลไม่ได้ ('+(err.code||err.message)+') ตรวจสอบกฎ Firestore')});
@@ -458,7 +497,7 @@ syncTheme();
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&autoDone&&!scanning&&Date.now()-S.get('set_time',0)>10*60*1000)scan()});
 render();
 startAuth();
-if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0)navigator.serviceWorker.register('sw.js').catch(()=>{});
+if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0)navigator.serviceWorker.register('sw.js').catch(e=>console.error('Service worker registration failed',e));
 </script>
 </body>
 </html>

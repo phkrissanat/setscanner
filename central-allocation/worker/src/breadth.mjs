@@ -55,27 +55,28 @@ export function summarize(run,chunks,now=Date.now()){
  }
  return {schemaVersion:1,ruleVersion:RULE,status:'ready',method:'tracked-universe-breadth',label:'ความแข็งแกร่งของกลุ่มในหุ้นที่ติดตาม (SET50)',generatedAt:new Date(now).toISOString(),expiresAt:new Date(Math.min(now+72*3600000,closeTime(asOf)+MAX_AGE)).toISOString(),asOf,membershipAsOf:run.membershipAsOf,universe:run.universe,source:run.source,groups,symbols:run.symbols};
 }
-async function json(url,options={}){
+async function json(url,options={},fetcher=fetch){
  const ac=new AbortController(),to=setTimeout(()=>ac.abort(),15000);
- try{const r=await fetch(url,{...options,signal:ac.signal,redirect:'manual'});if(!r.ok)throw Error('upstream-http-'+r.status);const t=await r.text();if(t.length>1000000)throw Error('response-too-large');return JSON.parse(t)}finally{clearTimeout(to)}
+ try{const r=await fetcher(url,{...options,signal:ac.signal,redirect:'manual'});if(!r.ok)throw Error('upstream-http-'+r.status+' '+new URL(url).hostname);const t=await r.text();if(t.length>1000000)throw Error('response-too-large');return JSON.parse(t)}finally{clearTimeout(to)}
 }
 const unavailable=(reason,now)=>({schemaVersion:1,ruleVersion:RULE,status:'unavailable',reason,generatedAt:new Date(now).toISOString(),groups:{},symbols:{}});
 export function runSlot(ms){const d=new Date(ms),m=d.getUTCMinutes(),h=d.getUTCHours();if(![11,13].includes(h)||m<30||m>35)throw Error('outside-schedule');return {runId:day(ms)+':'+h,batch:m-30}}
 export async function refreshBatch(env,scheduledTime,now=Date.now(),adminSlot=null){
  const {runId,batch}=adminSlot||runSlot(scheduledTime),prefix='run:'+runId+':';
+ const proxyJson=(target,options={})=>json(PROXY+encodeURIComponent(target),options,env.PROXY?env.PROXY.fetch.bind(env.PROXY):fetch);
  try{
   let run;
   if(batch===0){
    await env.ALLOCATION.put('latest',JSON.stringify(unavailable('updating',now)));
    const [tv,rows,metadata]=await Promise.all([
-    json(PROXY+encodeURIComponent('https://scanner.tradingview.com/thailand/scan'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({symbols:{symbolset:['SYML:SET;SET50']},columns:['name'],range:[0,100]})}),
+    proxyJson('https://scanner.tradingview.com/thailand/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({symbols:{symbolset:['SYML:SET;SET50']},columns:['name'],range:[0,100]})}),
     json(DATA+'thai_securities_compact_en.json'),json(DATA+'metadata_en.json')]);
    run={...makeUniverse(tv,rows,metadata,now),runId,startedAt:now};
    await env.ALLOCATION.put(prefix+'meta',JSON.stringify(run),{expirationTtl:86400});
   }else run=await env.ALLOCATION.get(prefix+'meta','json');
   if(!run||run.runId!==runId||now-run.startedAt>30*60000||now<run.startedAt)throw Error('missing-run');
   const queue=run.universe.slice(batch*10,(batch+1)*10),records=[];
-  const job=async()=>{while(queue.length){const sym=queue.shift();try{const j=await json(PROXY+encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(sym)+'.BK?range=6mo&interval=1d'));records.push(assessChart(j,sym,now))}catch{records.push({sym,status:'unavailable'})}}};
+  const job=async()=>{while(queue.length){const sym=queue.shift();try{const j=await proxyJson('https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(sym)+'.BK?range=6mo&interval=1d');records.push(assessChart(j,sym,now))}catch{records.push({sym,status:'unavailable'})}}};
   await Promise.all([job(),job(),job()]);
   await env.ALLOCATION.put(prefix+batch,JSON.stringify({runId,records}),{expirationTtl:86400});
   if(batch===5){const chunks=await Promise.all(Array.from({length:6},(_,i)=>env.ALLOCATION.get(prefix+i,'json')));const snapshot=summarize(run,chunks,now);await env.ALLOCATION.put('latest',JSON.stringify(snapshot));return snapshot}
