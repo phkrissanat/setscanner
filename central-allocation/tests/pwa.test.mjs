@@ -1,17 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {eligible,candidates} from '../pwa/allocation.mjs';
+import {groupPortfolio,portfolioPrice} from '../pwa/portfolio.mjs';
 import fs from 'node:fs';
 import vm from 'node:vm';
 test('PWA renders held excluded stock but hides both entry lists',()=>{
  const html=fs.readFileSync(new URL('../pwa/index.html',import.meta.url),'utf8');
- const script=html.match(/<script type="module">([\s\S]*?)<\/script>/)[1].replace(/import \{eligible, candidates\} from "\.\/allocation\.mjs";/,'');
+ const script=html.match(/<script type="module">([\s\S]*?)<\/script>/)[1].replace(/^import .*;$/gm,'');
  const nodes=new Map();const node=s=>{if(!nodes.has(s))nodes.set(s,{value:'',textContent:'',innerHTML:'',style:{},content:'',hidden:false});return nodes.get(s)};
- const ctx=vm.createContext({eligible,candidates,document:{querySelector:node,documentElement:{getAttribute:()=>null},addEventListener:()=>{}},localStorage:{getItem:()=>null},window:{},navigator:{},matchMedia:()=>({matches:false}),console});
+ const ctx=vm.createContext({eligible,candidates,groupPortfolio,portfolioPrice,document:{querySelector:node,documentElement:{getAttribute:()=>null},addEventListener:()=>{}},localStorage:{getItem:()=>null},window:{},navigator:{},matchMedia:()=>({matches:false}),console});
  vm.runInContext(script,ctx);
  vm.runInContext("results=[{sym:'BLOCKED',entry:true,price:100,chg:1,chgPct:1,zone:'up',t:1},{sym:'EARLY',zone:'dn',early:{entry:90,sl:80,riskPct:10},price:90,chg:1,chgPct:1,t:1}];held=['BLOCKED'];render()",ctx);
  assert.equal(node('#out').innerHTML.includes('BLOCKED'),false);
  assert.equal(node('#out3').innerHTML.includes('EARLY'),false);
  assert.equal(node('#out2').innerHTML.includes('BLOCKED'),true);
  assert.equal(typeof ctx.window.toggleRow,'function');
+ const section=id=>node('#out2').innerHTML.match(new RegExp('<section class="price-section" data-price-range="'+id+'"[^]*?</section>'))?.[0]||'';
+ vm.runInContext("results=[{sym:'BLOCKED',price:99,currentPrice:100,chg:1,chgPct:1,zone:'up',t:1}];lots={BLOCKED:[{p:90,q:100},{p:0,q:200}]};render()",ctx);
+ assert.match(section('100-150'),/<b>BLOCKED<\/b>/);
+ assert.doesNotMatch(section('50-100'),/<b>BLOCKED<\/b>/);
+ assert.match(node('#pfallocation').textContent,/30,000.00/);
+ vm.runInContext("results[0].currentPrice=150;render()",ctx);
+ assert.match(section('150-200'),/<b>BLOCKED<\/b>/);
+ assert.doesNotMatch(section('100-150'),/<b>BLOCKED<\/b>/);
 });

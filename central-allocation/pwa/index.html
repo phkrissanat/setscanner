@@ -43,6 +43,11 @@ label{display:block;font-size:13px;color:var(--mut);margin:8px 0 4px}
 .sec{font-size:16px;font-weight:600;margin:18px 0 8px}
 .sec span{color:var(--mut);font-weight:400}
 .sec.pf{display:flex;align-items:baseline;white-space:nowrap}
+.price-section{margin-top:16px}
+.price-section h2{display:flex;flex-wrap:wrap;gap:4px 12px;justify-content:space-between;align-items:baseline;border-top:1px solid var(--bd);padding-top:10px;margin:0 0 8px;font-size:14px;font-weight:600}
+.price-section h2 small{color:var(--mut);font-weight:400}
+.price-empty{color:var(--mut);font-size:12px;margin:0 0 10px}
+#pfallocation{margin-bottom:8px}
 .pfs{white-space:nowrap;overflow:hidden;min-width:0;font-size:12px;margin:0 0 0 8px;color:var(--mut);line-height:1.6}.pfs b{color:var(--tx)}.pfs b.up{color:var(--up)}.pfs b.dn{color:var(--dn)}
 .sy{display:flex;align-items:center;flex-wrap:wrap}
 .lots{grid-column:1/-1;border-top:1px dashed var(--bd);padding-top:10px;display:none;flex-wrap:wrap;gap:8px;align-items:center;cursor:default}
@@ -144,6 +149,7 @@ small{font-size:12px}
  <div class="list" id="out"></div>
 
  <div class="sec pf">portfolio&nbsp;<span id="nh"></span><span class="pfs" id="pfs"></span></div>
+ <div class="msg" id="pfallocation" role="status"></div>
  <div class="hd">
   <div>ชื่อหุ้น</div><div>ราคาเฉลี่ย</div><div>PnL</div><div>ตัดขาดทุน</div><div>ขาย</div>
  </div>
@@ -156,6 +162,7 @@ small{font-size:12px}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script type="module">
 import {eligible, candidates} from "./allocation.mjs";
+import {groupPortfolio, portfolioPrice} from "./portfolio.mjs";
 //#pure-start
 function ema(a,n){const o=Array(a.length).fill(null),k=2/(n+1);let p=0,s=0;for(let i=0;i<a.length;i++){if(i<n-1){s+=a[i];continue}if(i===n-1){s+=a[i];p=s/n;o[i]=p;continue}p=a[i]*k+p*(1-k);o[i]=p}return o}
 function macd(c){const a=ema(c,12),b=ema(c,26),line=c.map((_,i)=>b[i]==null?null:a[i]-b[i]);const f=line.findIndex(v=>v!=null),sig=Array(c.length).fill(null);if(f>=0)ema(line.slice(f),9).forEach((v,j)=>sig[f+j]=v);return{line,sig}}
@@ -228,6 +235,8 @@ async function load(sym){
    r.timestamp.forEach((t,i)=>{if(q.close[i]==null||q.high[i]==null||q.low[i]==null)return;d.t.push(t);d.c.push(q.close[i]);d.h.push(q.high[i]);d.l.push(q.low[i]);d.v.push(q.volume[i]||0)});
    dropOpenBar(d,Date.now());const x=analyze(sym,d);
    if(x.zone==='dn'&&!x.entry)x.early=h4Find(d.t.map((t,i)=>({h:d.h[i],l:d.l[i],c:d.c[i]})));
+   const quote=r.meta?.regularMarketPrice;
+   if(Number.isFinite(quote)&&quote>0){x.currentPrice=quote;x.quoteTime=r.meta.regularMarketTime}
    return x;
   }catch(e){err=e;await sleep(800*(a+1))}
  }
@@ -350,6 +359,7 @@ function lotsHtml(sym,price){
 const validLots=sym=>(lots[sym]||[]).filter(o=>o.p>0&&o.q>0);
 const avgOf=sym=>{const L=validLots(sym),q=L.reduce((a,o)=>a+o.q,0);return q?L.reduce((a,o)=>a+o.p*o.q,0)/q:null};
 const qtyOf=sym=>validLots(sym).reduce((a,o)=>a+o.q,0);
+const sharesOf=sym=>(lots[sym]||[]).reduce((a,o)=>a+(Number.isFinite(o.q)&&o.q>0?o.q:0),0);
 const crossPx=x=>(x.e26*(1-A26)-x.e12*(1-A12))/(A12-A26);
 function rowHtml(x,isHeld){
  const cl=x.chg>=0?'up':'dn',p=x.plan,na='<span class="na">—</span>';
@@ -359,17 +369,17 @@ function rowHtml(x,isHeld){
  const sp=sell?f2(x.sellPx!=null?x.sellPx:x.price):na;
  const av=isHeld?avgOf(x.sym):null;
  const c3=isHeld?(av!=null?f2(av):na):(p?f2(p.entry):na);
- const c4=isHeld?(av!=null?plTxt(x.price,av,qtyOf(x.sym)):na):sl;
+ const c4=isHeld?(av!=null?plTxt(portfolioPrice(x),av,qtyOf(x.sym)):na):sl;
  const l3=isHeld?'ราคาเฉลี่ย':'แนะนำ',l4=isHeld?'PnL':'ตัดขาดทุน';
  return `<div class="r${isHeld?'':' g4'}${openK.has(key)?' open':''}" onclick="toggleRow(event,this,'${key}')">
-  <div class="c sym" data-l="ชื่อหุ้น"><div class="sy"><label class="ck" onclick="event.stopPropagation()" title="ติ๊กเพื่อเพิ่ม/เอาออกจาก portfolio"><input type="checkbox" data-s="${x.sym}" ${held.includes(x.sym)?'checked':''}></label><b>${x.sym}</b>&nbsp;${sig}</div>${xdBadge(x.sym)}${industryBadge(x.sym)}</div>
+  <div class="c sym" data-l="ชื่อหุ้น"><div class="sy"><label class="ck" onclick="event.stopPropagation()" title="ติ๊กเพื่อเพิ่ม/เอาออกจาก portfolio"><input type="checkbox" data-s="${x.sym}" ${held.includes(x.sym)?'checked':''}></label><b>${x.sym}</b>&nbsp;${sig}</div>${isHeld?`<small class="na">ล่าสุด ${f2(portfolioPrice(x))}</small>`:''}${xdBadge(x.sym)}${industryBadge(x.sym)}</div>
   ${isHeld?'':`<div class="c" data-l="ราคา">${f2(x.price)} <small class="x ${cl}">${x.chg>=0?'+':''}${f2(x.chg)} (${x.chg>=0?'+':''}${f2(x.chgPct)}%)</small></div>`}
   <div class="c" data-l="${l3}">${c3}</div>
   <div class="c" data-l="${l4}">${c4}</div>
   ${isHeld?`<div class="c" data-l="ตัดขาดทุน">${x.trail?`<span class="dn">${f2(x.trail.sl)}</span> <small class="x">(-${x.trail.riskPct.toFixed(1)}%)</small>`:'<span class="na">ไม่พบ<span class="x"> swing low</span></span>'}</div>`:''}
   ${isHeld?`<div class="c" data-l="ขาย">${sp}</div>`:''}
-  ${isHeld?lotsHtml(x.sym,x.price):''}
-  ${isHeld?`<div class="det">${xdDet(x.sym)}${x.trail?`<p>ตัดขาดทุนแบบ trailing = swing low รายวันล่าสุดที่ยืนยันแล้ว (${x.trail.ago} แท่งก่อน) · ราคาปัจจุบัน ${f2(x.price)} (${sgn(x.chg)}${f2(x.chg)} · ${sgn(x.chgPct)}${f2(x.chgPct)}%)</p>`:`<p>ราคาปัจจุบัน ${f2(x.price)}</p>`}</div>`:''}
+  ${isHeld?lotsHtml(x.sym,portfolioPrice(x)):''}
+  ${isHeld?`<div class="det">${xdDet(x.sym)}${x.trail?`<p>ตัดขาดทุนแบบ trailing = swing low รายวันล่าสุดที่ยืนยันแล้ว (${x.trail.ago} แท่งก่อน) · ราคาปิดสำหรับสัญญาณ ${f2(x.price)} (${sgn(x.chg)}${f2(x.chg)} · ${sgn(x.chgPct)}${f2(x.chgPct)}%)</p>`:`<p>ราคาปิดสำหรับสัญญาณ ${f2(x.price)}</p>`}</div>`:''}
   ${isHeld?'':`<div class="det">
    ${xdDet(x.sym)}
    <p>วันนี้ ${f2(x.price)} (${sgn(x.chg)}${f2(x.chg)} · ${sgn(x.chgPct)}${f2(x.chgPct)}%)${p?` · ความเสี่ยงถึงตัดขาดทุน -${p.riskPct.toFixed(1)}%`:''}</p>
@@ -406,10 +416,12 @@ function render(){
  $('#ne').textContent=`(${es.length})`;
  $('#out3').innerHTML=es.length?es.map(e=>earlyRow(by[e.sym],e)).join(''):`<div class="panel msg">${ok.length?'ไม่มีหุ้น':scanning?'กำลังสแกน…':'ยังไม่มีข้อมูลที่ใช้ได้'}</div>`;
  {const cn=closed.length,w=closed.filter(c=>c.pnl>0).length,rl=closed.reduce((a,c)=>a+c.pnl,0);
-  let fl=0;hs.forEach(k=>{const x=by[k],av=avgOf(k);if(x&&av!=null)fl+=(x.price-av)*qtyOf(k)});
+  let fl=0;hs.forEach(k=>{const x=by[k],av=avgOf(k);if(x&&av!=null)fl+=(portfolioPrice(x)-av)*qtyOf(k)});
   const cs=v=>`<b class="${v>=0?'up':'dn'}">${sgn(v)}${f2(v)}</b>`;
   $('#pfs').innerHTML=`WR <b>${cn?Math.round(w/cn*100)+'%':'—'}</b> · PnL ${cs(rl+fl)} · Profit ${cs(rl)}`}
- $('#out2').innerHTML=hs.length?hs.map(s=>by[s]?rowHtml(by[s],true):missRow(s)).join(''):'<div class="panel msg">ไม่มีรายการ</div>';
+ const portfolio=groupPortfolio(hs,by,sharesOf);
+ $('#pfallocation').textContent=hs.length?'มูลค่า'+(portfolio.unvalued?'ที่คำนวณได้':'พอร์ต')+' '+f2(portfolio.total)+' บาท · จัดกลุ่มตามราคาที่สแกนล่าสุด · ใช้ราคาปิดเมื่อไม่มีราคาล่าสุด · สัดส่วน = มูลค่ากลุ่ม ÷ '+(portfolio.unvalued?'มูลค่าที่คำนวณได้ · ยังขาดราคาหรือจำนวนหุ้น '+portfolio.unvalued+' ตัว':'มูลค่าพอร์ต'):'';
+ $('#out2').innerHTML=hs.length?portfolio.groups.map(g=>`<section class="price-section" data-price-range="${g.id}" aria-label="กลุ่มราคา ${g.label}"><h2><span>${g.label} · ${g.symbols.length} ตัว</span><small>${f2(g.value)} บาท · ${g.weight===null||!g.symbols.length||g.unvalued===g.symbols.length?'—':g.weight.toFixed(1)+'%'}${g.unvalued?' · มูลค่ายังไม่ครบ':''}</small></h2>${g.symbols.length?g.symbols.map(s=>by[s]?rowHtml(by[s],true):missRow(s)).join(''):'<p class="price-empty">ไม่มีหุ้นในช่วงราคานี้</p>'}</section>`).join(''):'<div class="panel msg">ไม่มีรายการ</div>';
 }
 const saveLots=()=>persist();
 async function livePx(sym){
