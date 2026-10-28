@@ -420,7 +420,7 @@ function render(){
   const cs=v=>`<b class="${v>=0?'up':'dn'}">${sgn(v)}${f2(v)}</b>`;
   $('#pfs').innerHTML=`WR <b>${cn?Math.round(w/cn*100)+'%':'—'}</b> · PnL ${cs(rl+fl)} · Profit ${cs(rl)}`}
  const portfolio=groupPortfolio(hs,by,sharesOf);
- $('#pfallocation').textContent=hs.length?'มูลค่า'+(portfolio.unvalued?'ที่คำนวณได้':'พอร์ต')+' '+f2(portfolio.total)+' บาท · จัดกลุ่มตามราคาที่สแกนล่าสุด · ใช้ราคาปิดเมื่อไม่มีราคาล่าสุด · สัดส่วน = มูลค่ากลุ่ม ÷ '+(portfolio.unvalued?'มูลค่าที่คำนวณได้ · ยังขาดราคาหรือจำนวนหุ้น '+portfolio.unvalued+' ตัว':'มูลค่าพอร์ต'):'';
+ $('#pfallocation').textContent=hs.length?'มูลค่า'+(portfolio.unvalued?'ที่คำนวณได้':'พอร์ต')+' '+f2(portfolio.total)+' บาท':'';
  $('#out2').innerHTML=hs.length?portfolio.groups.map(g=>`<section class="price-section" data-price-range="${g.id}" aria-label="กลุ่มราคา ${g.label}"><h2><span>${g.label} · ${g.symbols.length} ตัว</span><small>${f2(g.value)} บาท · ${g.weight===null||!g.symbols.length||g.unvalued===g.symbols.length?'—':g.weight.toFixed(1)+'%'}${g.unvalued?' · มูลค่ายังไม่ครบ':''}</small></h2>${g.symbols.length?g.symbols.map(s=>by[s]?rowHtml(by[s],true):missRow(s)).join(''):'<p class="price-empty">ไม่มีหุ้นในช่วงราคานี้</p>'}</section>`).join(''):'<div class="panel msg">ไม่มีรายการ</div>';
 }
 const saveLots=()=>persist();
