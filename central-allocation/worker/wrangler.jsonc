@@ -1,0 +1,29 @@
+{
+  "name": "setscanner-allocation",
+  "main": "src/breadth.mjs",
+  "compatibility_date": "2026-10-28",
+  "triggers": {
+    "crons": [
+      "30-35 11,13 * * 1-5"
+    ]
+  },
+  "kv_namespaces": [
+    {
+      "binding": "ALLOCATION",
+      "id": "ff6b9ff093b94d1283540537ad7705c5"
+    }
+  ],
+  "vars": {
+    "PWA_ORIGIN": "https://phkrissanat.github.io"
+  },
+  "observability": {
+    "enabled": true
+  },
+  "account_id": "7693da0db03bdf19b7b6416845fc907f",
+  "services": [
+    {
+      "binding": "PROXY",
+      "service": "set-proxy"
+    }
+  ]
+}
