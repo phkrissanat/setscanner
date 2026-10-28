@@ -3,9 +3,7 @@
   "main": "src/breadth.mjs",
   "compatibility_date": "2026-10-28",
   "triggers": {
-    "crons": [
-      "30-35 11,13 * * 1-5"
-    ]
+    "crons": []
   },
   "kv_namespaces": [
     {
