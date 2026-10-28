@@ -1,3 +1,17 @@
+# สถานะล่าสุด — 28 ตุลาคม 2026
+
+ติดตั้ง Cloudflare Worker `setscanner-allocation` ด้วยโค้ดตัวกรองจริงแล้ว ผูก KV `ALLOCATION` กับ namespace `ff6b9ff093b94d1283540537ad7705c5` และตั้ง `PWA_ORIGIN=https://phkrissanat.github.io` แล้ว
+
+ทดสอบ `https://setscanner-allocation.phkrissanath.workers.dev/health` บนบริการจริง: ได้ `{"status":"unavailable","generatedAt":null}` แสดงว่าบริการอ่านที่เก็บผลได้ แต่ยังไม่มีผลตลาด ไม่ใช่ผลกรองพร้อมใช้งาน
+
+**ยังไม่ตั้ง INDUSTRY_FEED_URL และยังไม่เปิด Cron** เพราะ SET API ประวัติดัชนีตอบ 403 ทั้งตรงและผ่าน proxy เดิม ต้องเลือกแหล่งข้อมูลที่ server เรียกได้และยืนยันตารางสมาชิกหุ้นก่อน จึงจะเปิดตาราง 18:30/20:30 ไทยได้ การตั้งเวลาไว้โดยไม่มี feed จะเกิด refresh failure ทุกครั้ง จึงเก็บ `triggers.crons=[]` ให้ตรงกับ Cloudflare ขณะนี้
+
+PWA รุ่นทดลองใต้ `central-allocation/pwa/` ชี้ endpoint จริงแล้ว แต่ production root ไม่เปลี่ยนและ PR ยังเป็น draft ส่วน proxy เดิมไม่ถูกแก้ไข
+
+บันทึกด้านล่างเป็นรายละเอียดการออกแบบและประวัติก่อนติดตั้ง ให้ยึดสถานะล่าสุดด้านบนเมื่อข้อความขัดกัน
+
+---
+
 # SET scanner — ตัวกรองอุตสาหกรรมส่วนกลาง
 
 สถานะ: โค้ดพร้อมทดสอบเชื่อมระบบ ยังไม่ได้ deploy และยังไม่มีแหล่งข้อมูลจริงที่เชื่อมแล้ว
