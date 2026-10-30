@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {groupPortfolio,portfolioPrice} from '../pwa/portfolio.mjs';
+import {groupPortfolio,portfolioPrice,returnPercentages} from '../pwa/portfolio.mjs';
 import fs from 'node:fs';
 import vm from 'node:vm';
 test('PWA scans and displays technical signals without industry gates or messages',async()=>{
  const html=fs.readFileSync(new URL('../pwa/index.html',import.meta.url),'utf8');
  const script=html.match(/<script type="module">([\s\S]*?)<\/script>/)[1].replace(/^import .*;$/gm,'');
  const nodes=new Map();const node=s=>{if(!nodes.has(s))nodes.set(s,{value:'',textContent:'',innerHTML:'',style:{},content:'',hidden:false});return nodes.get(s)};
- const ctx=vm.createContext({groupPortfolio,portfolioPrice,document:{querySelector:node,documentElement:{getAttribute:()=>null},addEventListener:()=>{}},localStorage:{getItem:()=>null},window:{},navigator:{},matchMedia:()=>({matches:false}),setTimeout:fn=>{fn();return 1},console});
+ const ctx=vm.createContext({groupPortfolio,portfolioPrice,returnPercentages,document:{querySelector:node,documentElement:{getAttribute:()=>null},addEventListener:()=>{}},localStorage:{getItem:()=>null},window:{},navigator:{},matchMedia:()=>({matches:false}),setTimeout:fn=>{fn();return 1},console});
  vm.runInContext(script,ctx);
  vm.runInContext("results=[{sym:'BLOCKED',entry:true,price:100,chg:1,chgPct:1,zone:'up',t:1},{sym:'EARLY',zone:'dn',early:{entry:90,sl:80,riskPct:10},price:90,chg:1,chgPct:1,t:1}];held=['BLOCKED'];render()",ctx);
  assert.equal(node('#out').innerHTML.includes('BLOCKED'),true);
@@ -22,6 +22,9 @@ test('PWA scans and displays technical signals without industry gates or message
  vm.runInContext("results[0].currentPrice=150;render()",ctx);
  assert.match(section('150-200'),/<b>BLOCKED<\/b>/);
  assert.doesNotMatch(section('100-150'),/<b>BLOCKED<\/b>/);
+ vm.runInContext("lots={BLOCKED:[{p:100,q:100}]};results[0].currentPrice=110;closed=[{buy:20,q:500,pnl:2000}];render()",ctx);
+ assert.match(node('#pfs').innerHTML,/PnL <b[^>]*>\+3,000\.00 \(\+15\.00%\)/);
+ assert.match(node('#pfs').innerHTML,/Profit <b[^>]*>\+2,000\.00 \(\+20\.00%\)/);
  assert.doesNotMatch(html,/allocation-status|allocation-endpoint|industryBadge|refreshAllocation|allowed\(/);
  await vm.runInContext("$('#list').value='NEW,EARLY';held=['HELD'];updateSet50=async()=>true;load=async sym=>({sym,entry:sym==='NEW',price:10,chg:1,chgPct:1,zone:sym==='EARLY'?'dn':'up',early:sym==='EARLY'?{entry:10,sl:9,riskPct:10}:null,t:1});fetchXD=async()=>true;scan()",ctx);
  assert.deepEqual(Array.from(vm.runInContext('results.map(x=>x.sym).sort()',ctx)),['EARLY','HELD','NEW']);

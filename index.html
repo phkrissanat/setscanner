@@ -41,13 +41,13 @@ label{display:block;font-size:13px;color:var(--mut);margin:8px 0 4px}
 [hidden]{display:none!important}
 .sec{font-size:16px;font-weight:600;margin:18px 0 8px}
 .sec span{color:var(--mut);font-weight:400}
-.sec.pf{display:flex;align-items:baseline;white-space:nowrap}
+.sec.pf{display:flex;align-items:baseline;flex-wrap:wrap}
 .price-section{margin-top:16px}
 .price-section h2{display:flex;flex-wrap:wrap;gap:4px 12px;justify-content:space-between;align-items:baseline;border-top:1px solid var(--bd);padding-top:10px;margin:0 0 8px;font-size:14px;font-weight:600}
 .price-section h2 small{color:var(--mut);font-weight:400}
 .price-empty{color:var(--mut);font-size:12px;margin:0 0 10px}
 #pfallocation{margin-bottom:8px}
-.pfs{white-space:nowrap;overflow:hidden;min-width:0;font-size:12px;margin:0 0 0 8px;color:var(--mut);line-height:1.6}.pfs b{color:var(--tx)}.pfs b.up{color:var(--up)}.pfs b.dn{color:var(--dn)}
+.pfs{display:flex;flex-wrap:wrap;flex:1 1 280px;gap:2px 12px;min-width:0;font-size:12px;margin:0 0 0 8px;color:var(--mut);line-height:1.6}.pfs>span{white-space:nowrap}.pfs b{color:var(--tx)}.pfs b.up{color:var(--up)}.pfs b.dn{color:var(--dn)}
 .sy{display:flex;align-items:center;flex-wrap:wrap}
 .lots{grid-column:1/-1;border-top:1px dashed var(--bd);padding-top:10px;display:none;flex-wrap:wrap;gap:8px;align-items:center;cursor:default}
 .lot{display:flex;align-items:center;gap:6px;border:1px solid var(--bd);border-radius:8px;padding:2px 4px 2px 10px;font-size:13px}
@@ -159,7 +159,7 @@ small{font-size:12px}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script type="module">
-import {groupPortfolio, portfolioPrice} from "./portfolio.mjs";
+import {groupPortfolio, portfolioPrice, returnPercentages} from "./portfolio.mjs";
 //#pure-start
 function ema(a,n){const o=Array(a.length).fill(null),k=2/(n+1);let p=0,s=0;for(let i=0;i<a.length;i++){if(i<n-1){s+=a[i];continue}if(i===n-1){s+=a[i];p=s/n;o[i]=p;continue}p=a[i]*k+p*(1-k);o[i]=p}return o}
 function macd(c){const a=ema(c,12),b=ema(c,26),line=c.map((_,i)=>b[i]==null?null:a[i]-b[i]);const f=line.findIndex(v=>v!=null),sig=Array(c.length).fill(null);if(f>=0)ema(line.slice(f),9).forEach((v,j)=>sig[f+j]=v);return{line,sig}}
@@ -393,8 +393,9 @@ function render(){
  $('#out3').innerHTML=es.length?es.map(e=>earlyRow(by[e.sym],e)).join(''):`<div class="panel msg">${ok.length?'ไม่มีหุ้น':scanning?'กำลังสแกน…':'ยังไม่มีข้อมูลที่ใช้ได้'}</div>`;
  {const cn=closed.length,w=closed.filter(c=>c.pnl>0).length,rl=closed.reduce((a,c)=>a+c.pnl,0);
   let fl=0;hs.forEach(k=>{const x=by[k],av=avgOf(k);if(x&&av!=null)fl+=(portfolioPrice(x)-av)*qtyOf(k)});
-  const cs=v=>`<b class="${v>=0?'up':'dn'}">${sgn(v)}${f2(v)}</b>`;
-  $('#pfs').innerHTML=`WR <b>${cn?Math.round(w/cn*100)+'%':'—'}</b> · PnL ${cs(rl+fl)} · Profit ${cs(rl)}`}
+  const pct=returnPercentages({held:hs,by,lots,closed,pnl:rl+fl,profit:rl});
+  const cs=(v,p)=>`<b class="${v>=0?'up':'dn'}">${sgn(v)}${f2(v)} (${p===null?'—':sgn(p)+f2(p)+'%'})</b>`;
+  $('#pfs').innerHTML=`<span>WR <b>${cn?Math.round(w/cn*100)+'%':'—'}</b></span><span title="PnL รวม ÷ ต้นทุนรายการที่ถือและปิดแล้ว">PnL ${cs(rl+fl,pct.pnlPct)}</span><span title="กำไร/ขาดทุนที่ปิดแล้ว ÷ ต้นทุนรายการที่ปิดแล้ว">Profit ${cs(rl,pct.profitPct)}</span>`}
  const portfolio=groupPortfolio(hs,by,sharesOf);
  $('#pfallocation').textContent=hs.length?'มูลค่า'+(portfolio.unvalued?'ที่คำนวณได้':'พอร์ต')+' '+f2(portfolio.total)+' บาท':'';
  $('#out2').innerHTML=hs.length?portfolio.groups.map(g=>`<section class="price-section" data-price-range="${g.id}" aria-label="กลุ่มราคา ${g.label}"><h2><span>${g.label} · ${g.symbols.length} ตัว</span><small>${f2(g.value)} บาท · ${g.weight===null||!g.symbols.length||g.unvalued===g.symbols.length?'—':g.weight.toFixed(1)+'%'}${g.unvalued?' · มูลค่ายังไม่ครบ':''}</small></h2>${g.symbols.length?g.symbols.map(s=>by[s]?rowHtml(by[s],true):missRow(s)).join(''):'<p class="price-empty">ไม่มีหุ้นในช่วงราคานี้</p>'}</section>`).join(''):'<div class="panel msg">ไม่มีรายการ</div>';

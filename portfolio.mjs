@@ -27,3 +27,24 @@ export function groupPortfolio(held,by,quantity){
  for(const group of groups)group.weight=total>0?group.value/total*100:null;
  return {groups,total,unvalued};
 }
+
+// Cost-weighted return on recorded lots, not an account or annualized return.
+export function returnPercentages({held,by,lots,closed,pnl,profit}){
+ let openCost=0,closedCost=0,openComplete=true,closedComplete=true;
+ for(const sym of new Set(held)){
+  for(const lot of lots[sym]||[]){
+   if(!(Number.isFinite(lot.q)&&lot.q>0))continue;
+   const cost=lot.p*lot.q;
+   if(!(Number.isFinite(lot.p)&&lot.p>0&&Number.isFinite(cost))){openComplete=false;continue}
+   openCost+=cost;
+   if(portfolioPrice(by[sym])===null)openComplete=false;
+  }
+ }
+ for(const lot of closed){
+  const cost=lot.buy*lot.q;
+  if(!(Number.isFinite(lot.buy)&&lot.buy>0&&Number.isFinite(lot.q)&&lot.q>0&&Number.isFinite(cost)&&Number.isFinite(lot.pnl))){closedComplete=false;continue}
+  closedCost+=cost;
+ }
+ const ratio=(value,cost,complete)=>complete&&Number.isFinite(value)&&Number.isFinite(cost)&&cost>0?value/cost*100:null;
+ return {pnlPct:ratio(pnl,openCost+closedCost,openComplete&&closedComplete),profitPct:ratio(profit,closedCost,closedComplete)};
+}

@@ -1,5 +1,5 @@
 const PREFIX = 'set-scanner-' + encodeURIComponent(self.registration.scope) + '-';
-const CACHE = PREFIX + 'v7-technical-signals';
+const CACHE = PREFIX + 'v8-return-percentages';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'portfolio.mjs'];
 const assetURLs = new Set(FILES.map(p => new URL(p, self.registration.scope).href));
 self.addEventListener('install', e => {
